@@ -82,133 +82,133 @@
     return (index % 2 === 0) ? 0 : settings.circleRadius;
   }
 
+  // ── Vertical grid step (distance between row centres) ────────
+  function rowStep() {
+    return settings.circleRadius * 2 + settings.gap;
+  }
+
   // ── Circle (drop) class ───────────────────────────────────────
   class Drop {
     constructor(colIndex) {
       this.col = colIndex;
       this.x = columnX(colIndex);
-      this.baseY = -settings.circleRadius * 2;
-      this.y = this.baseY;
-      this.trail = [];           // {x, y, r, alpha}
+      this.row = -1;                // current grid row (0 = top visible row)
+      this.y = -rowStep();          // pixel y of the leading circle
+      this.trail = [];              // array of grid-row y positions visited
       this.alive = true;
-      // slight speed variation for organic feel
-      this.speedMul = 0.85 + Math.random() * 0.3;
+      // frame counter for quantized movement
+      this.tickCounter = 0;
+      // ticks between each grid step (derived from fallSpeed)
+      this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
+      // slight variation for organic feel
+      this.tickInterval += Math.floor(Math.random() * 3) - 1;
     }
 
     update() {
-      const r = settings.circleRadius;
-      const speed = settings.fallSpeed * this.speedMul;
+      this.tickCounter++;
+      if (this.tickCounter >= this.tickInterval) {
+        this.tickCounter = 0;
+        // Advance one grid row
+        this.row++;
+        this.y = this.row * rowStep();
 
-      // Record trail before moving
-      this.trail.push({ x: this.x, y: this.y, r, alpha: 1 });
-      if (this.trail.length > settings.trailLength) this.trail.shift();
+        // Push current position into trail (trail stores y values)
+        this.trail.push(this.y);
+        if (this.trail.length > settings.trailLength) this.trail.shift();
 
-      // Move
-      this.y += speed;
-
-      // Fade / shrink trail
-      const len = this.trail.length;
-      for (let i = 0; i < len; i++) {
-        const t = (i + 1) / len;  // 0→1, newest = 1
-        this.trail[i].alpha = t * 0.6;
-        this.trail[i].r = r * (0.2 + 0.8 * t);
+        // Recalculate tick interval in case fallSpeed changed
+        this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
       }
 
-      // Off screen?
-      if (this.y - r > H() + settings.trailLength * speed * 2) {
+      // Off screen? (leading circle plus trail all off-screen)
+      const trailTop = this.trail.length > 0 ? this.trail[0] : this.y;
+      if (trailTop > H() + rowStep() * 2) {
         this.alive = false;
       }
     }
 
-    draw(ctx) {
-      const yOff = columnYOffset(this.col);
+    /* Helper: apply mouse effect and return draw adjustments */
+    _mouseInfluence(px, py) {
       const mr = settings.mouseRadius;
       const effect = settings.mouseEffect;
+      const dist = Math.hypot(px - mouse.x, py - mouse.y);
+      const influence = dist < mr ? 1 - dist / mr : 0;
+      let dx = 0, dy = 0, extra = 0, hue = -1, freeze = 1;
 
-      // Draw trail
-      for (const t of this.trail) {
-        let dx = 0, dy = 0;
-        let extra = 0;
-        let hue = -1;
-        let freeze = 1;
-        const dist = Math.hypot(t.x - mouse.x, (t.y + yOff) - mouse.y);
-        const influence = dist < mr ? 1 - dist / mr : 0;
-
-        if (influence > 0) {
-          if (effect === "repel") {
-            const angle = Math.atan2((t.y + yOff) - mouse.y, t.x - mouse.x);
-            dx = Math.cos(angle) * influence * 12;
-            dy = Math.sin(angle) * influence * 12;
-          } else if (effect === "attract") {
-            const angle = Math.atan2(mouse.y - (t.y + yOff), mouse.x - t.x);
-            dx = Math.cos(angle) * influence * 8;
-            dy = Math.sin(angle) * influence * 8;
-          } else if (effect === "glow") {
-            extra = influence * 0.5;
-          } else if (effect === "color") {
-            hue = influence * 220 + 180; // cyan → blue shift
-          } else if (effect === "freeze") {
-            freeze = 1 - influence * 0.95;
-          }
+      if (influence > 0) {
+        if (effect === "repel") {
+          const angle = Math.atan2(py - mouse.y, px - mouse.x);
+          dx = Math.cos(angle) * influence * 12;
+          dy = Math.sin(angle) * influence * 12;
+        } else if (effect === "attract") {
+          const angle = Math.atan2(mouse.y - py, mouse.x - px);
+          dx = Math.cos(angle) * influence * 8;
+          dy = Math.sin(angle) * influence * 8;
+        } else if (effect === "glow") {
+          extra = influence * 0.5;
+        } else if (effect === "color") {
+          hue = influence * 220 + 180;
+        } else if (effect === "freeze") {
+          freeze = 1 - influence * 0.95;
         }
+      }
+      return { dx, dy, extra, hue, freeze, influence };
+    }
 
-        const alpha = t.alpha * (freeze < 1 ? Math.max(freeze, 0.3) : 1) + extra;
+    draw(ctx) {
+      const yOff = columnYOffset(this.col);
+      const r = settings.circleRadius;
+      const effect = settings.mouseEffect;
+      const trailLen = this.trail.length;
+
+      // Draw trail circles (oldest first, smallest first)
+      for (let i = 0; i < trailLen; i++) {
+        const ty = this.trail[i] + yOff;
+        // i=0 is oldest/top, i=trailLen-1 is newest (just behind head)
+        // Head is at this.y which is trail[trailLen-1] or newer
+        // Scale: oldest = smallest, newest trail = second largest
+        const t = (i + 1) / (trailLen + 1); // 0→1 approaching head
+        const circleR = r * (0.2 + 0.8 * t);
+        const alpha = 0.15 + 0.55 * t;
+
+        const mi = this._mouseInfluence(this.x, ty);
+        const finalAlpha = alpha * (mi.freeze < 1 ? Math.max(mi.freeze, 0.3) : 1) + mi.extra;
 
         ctx.beginPath();
-        ctx.arc(t.x + dx, t.y + yOff + dy, Math.max(t.r * 0.95, 1), 0, Math.PI * 2);
-        if (hue >= 0) {
-          ctx.fillStyle = `hsla(${hue}, 80%, 70%, ${alpha})`;
+        ctx.arc(this.x + mi.dx, ty + mi.dy, Math.max(circleR, 1), 0, Math.PI * 2);
+        if (mi.hue >= 0) {
+          ctx.fillStyle = `hsla(${mi.hue}, 80%, 70%, ${finalAlpha})`;
         } else {
-          ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+          ctx.fillStyle = `rgba(255,255,255,${finalAlpha})`;
         }
         ctx.fill();
 
-        // Glow aura
-        if (effect === "glow" && influence > 0) {
+        if (effect === "glow" && mi.influence > 0) {
           ctx.beginPath();
-          ctx.arc(t.x + dx, t.y + yOff + dy, t.r * 1.6, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255,255,255,${influence * 0.08})`;
+          ctx.arc(this.x + mi.dx, ty + mi.dy, circleR * 1.6, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.08})`;
           ctx.fill();
         }
       }
 
-      // Draw main circle
-      let dx = 0, dy = 0;
-      let extra = 0;
-      let hue = -1;
-      const dist = Math.hypot(this.x - mouse.x, (this.y + yOff) - mouse.y);
-      const influence = dist < mr ? 1 - dist / mr : 0;
-
-      if (influence > 0) {
-        if (effect === "repel") {
-          const angle = Math.atan2((this.y + yOff) - mouse.y, this.x - mouse.x);
-          dx = Math.cos(angle) * influence * 14;
-          dy = Math.sin(angle) * influence * 14;
-        } else if (effect === "attract") {
-          const angle = Math.atan2(mouse.y - (this.y + yOff), mouse.x - this.x);
-          dx = Math.cos(angle) * influence * 10;
-          dy = Math.sin(angle) * influence * 10;
-        } else if (effect === "glow") {
-          extra = influence * 0.4;
-        } else if (effect === "color") {
-          hue = influence * 220 + 180;
-        }
-      }
+      // Draw leading (head) circle – the largest
+      const headY = this.y + yOff;
+      const mi = this._mouseInfluence(this.x, headY);
+      const headAlpha = 0.95 + mi.extra;
 
       ctx.beginPath();
-      ctx.arc(this.x + dx, this.y + yOff + dy, settings.circleRadius, 0, Math.PI * 2);
-      if (hue >= 0) {
-        ctx.fillStyle = `hsla(${hue}, 90%, 80%, ${1})`;
+      ctx.arc(this.x + mi.dx, headY + mi.dy, r, 0, Math.PI * 2);
+      if (mi.hue >= 0) {
+        ctx.fillStyle = `hsla(${mi.hue}, 90%, 80%, ${headAlpha})`;
       } else {
-        ctx.fillStyle = `rgba(255,255,255,${0.95 + extra})`;
+        ctx.fillStyle = `rgba(255,255,255,${headAlpha})`;
       }
       ctx.fill();
 
-      // Glow aura on main circle
-      if (effect === "glow" && influence > 0) {
+      if (effect === "glow" && mi.influence > 0) {
         ctx.beginPath();
-        ctx.arc(this.x + dx, this.y + yOff + dy, settings.circleRadius * 2.2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,255,255,${influence * 0.12})`;
+        ctx.arc(this.x + mi.dx, headY + mi.dy, r * 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.12})`;
         ctx.fill();
       }
     }
@@ -258,20 +258,17 @@
       }
     }
 
-    // Freeze effect: slow down drops near mouse
-    const mr = settings.mouseRadius;
-
     // Update & draw
     for (const d of drops) {
-      // If freeze effect, modulate speed temporarily
+      // If freeze effect, temporarily slow the tick counter
       if (settings.mouseEffect === "freeze") {
         const yOff = columnYOffset(d.col);
         const dist = Math.hypot(d.x - mouse.x, (d.y + yOff) - mouse.y);
+        const mr = settings.mouseRadius;
         const influence = dist < mr ? 1 - dist / mr : 0;
-        const origMul = d.speedMul;
-        d.speedMul = origMul * (1 - influence * 0.95);
-        d.update();
-        d.speedMul = origMul;
+        if (!(influence > 0.5 && Math.random() < influence * 0.9)) {
+          d.update();
+        }
       } else {
         d.update();
       }
