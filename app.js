@@ -344,7 +344,11 @@
     }
     octx.drawImage(img, drawX, drawY, drawW, drawH);
     bgImage = offscreen;
-    bgImageData = octx.getImageData(0, 0, sw, sh);
+    try {
+      bgImageData = octx.getImageData(0, 0, sw, sh);
+    } catch (e) {
+      bgImageData = null;
+    }
   }
 
   /* Sample pixel color from the background image at (x, y).
@@ -366,6 +370,7 @@
         const url = Array.isArray(urls) ? urls[0] : urls;
         if (!url) return;
         const img = new Image();
+        img.crossOrigin = "anonymous";
         img.onload = () => {
           _bgRawImg = img;
           fitImageToScreen(img);
@@ -394,6 +399,19 @@
     let n = 0;
     for (const d of drops) if (d.col === ci) n++;
     return n;
+  }
+
+  // Check that no existing drop in the same column is within 3 vertical
+  // row steps of a newly spawned drop (which starts near the top).
+  function canSpawnInColumn(ci) {
+    const minSpacing = 3 * rowStep();
+    const spawnY = -rowStep(); // new drops start at row -1
+    for (const d of drops) {
+      if (d.col !== ci) continue;
+      const headY = settings.continuousHead ? d.continuousY : d.y;
+      if (Math.abs(headY - spawnY) < minSpacing) return false;
+    }
+    return true;
   }
 
   // ── Pre-seed the screen so it starts looking populated ────────
@@ -450,7 +468,7 @@
         columnCooldowns[c]--;
         continue;
       }
-      if (dropsInColumn(c) < settings.maxPerColumn && Math.random() < settings.spawnRate) {
+      if (dropsInColumn(c) < settings.maxPerColumn && canSpawnInColumn(c) && Math.random() < settings.spawnRate) {
         drops.push(new Drop(c));
         columnCooldowns[c] = randomCooldown();
       }
@@ -465,7 +483,7 @@
         for (let c = 0; c < cols; c++) {
           const cx = columnX(c);
           if (Math.abs(cx - mouse.x) < settings.mouseRadius * 0.5) {
-            if (dropsInColumn(c) < settings.maxPerColumn + 2 && Math.random() < 0.35) {
+            if (dropsInColumn(c) < settings.maxPerColumn + 2 && canSpawnInColumn(c) && Math.random() < 0.35) {
               drops.push(new Drop(c));
             }
           }
