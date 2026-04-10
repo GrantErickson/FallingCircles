@@ -1,6 +1,6 @@
 # Falling Circles
 
-A mesmerising, interactive canvas animation of circles cascading down tightly-packed columns. Built with vanilla HTML, CSS, and JavaScript — no frameworks or build steps required.
+A mesmerizing, interactive canvas animation of circles cascading down tightly-packed columns. Built with vanilla HTML, CSS, and JavaScript — no frameworks or build steps required.
 
 ## ▶ Live Demo
 
