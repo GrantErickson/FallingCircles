@@ -22,15 +22,15 @@
 
   // ── Settings ──────────────────────────────────────────────────
   const settings = {
-    circleRadius: 8,
-    fallSpeed: 2,
+    circleRadius: 10,
+    fallSpeed: 1.25,
     spawnRate: 0.025,    // probability per column per frame
-    trailLength: 20,
-    maxPerColumn: 5,
-    gap: 2,              // px gap between adjacent circles
+    trailLength: 24,
+    maxPerColumn: 8,
+    gap: 1,              // px gap between adjacent circles
     mouseEffect: "glow",
     mouseRadius: 120,
-    continuousHead: false, // head falls continuously without smoothing
+    continuousHead: true, // head falls continuously without smoothing
     headSmoothing: 0.8,  // 0 = snap to grid row, 1 = fully interpolated glide
     headScaleMin: 0.3,   // minimum scale when head first appears at new row
     headFadeMin: 0.4,    // minimum opacity when head first appears at new row
@@ -239,7 +239,13 @@
         if (mi.hue >= 0) {
           ctx.fillStyle = `hsla(${mi.hue}, 80%, 70%, ${finalAlpha})`;
         } else {
-          ctx.fillStyle = `rgba(255,255,255,${finalAlpha})`;
+          // Sample colour from the background image if available
+          const bgC = sampleBgColor(this.x + mi.dx, ty + mi.dy);
+          if (bgC) {
+            ctx.fillStyle = `rgba(${bgC.r},${bgC.g},${bgC.b},${finalAlpha})`;
+          } else {
+            ctx.fillStyle = `rgba(255,255,255,${finalAlpha})`;
+          }
         }
         ctx.fill();
 
@@ -301,10 +307,85 @@
     }
   }
 
+  // ── Background image for trail colour sampling ──────────────
+  let bgImage = null;       // offscreen canvas with cover-fitted image
+  let bgImageW = 0;
+  let bgImageH = 0;
+  let bgImageData = null;  // cached Uint8ClampedArray of pixel data
+  let _bgRawImg = null;
+
+  function fitImageToScreen(img) {
+    const sw = W();
+    const sh = H();
+    bgImageW = sw;
+    bgImageH = sh;
+    const offscreen = document.createElement("canvas");
+    offscreen.width = sw;
+    offscreen.height = sh;
+    const octx = offscreen.getContext("2d");
+
+    // Cover: scale image to fill screen, crop excess equally
+    const imgAspect = img.naturalWidth / img.naturalHeight;
+    const scrAspect = sw / sh;
+    let drawW, drawH, drawX, drawY;
+    if (imgAspect > scrAspect) {
+      // Image is wider → fit height, crop sides
+      drawH = sh;
+      drawW = sh * imgAspect;
+      drawX = (sw - drawW) / 2;
+      drawY = 0;
+    } else {
+      // Image is taller → fit width, crop top/bottom
+      drawW = sw;
+      drawH = sw / imgAspect;
+      drawX = 0;
+      drawY = (sh - drawH) / 2;
+    }
+    octx.drawImage(img, drawX, drawY, drawW, drawH);
+    bgImage = offscreen;
+    // Cache full pixel data for fast per-pixel sampling
+    bgImageData = octx.getImageData(0, 0, sw, sh).data;
+  }
+
+  function loadBackgroundImage() {
+    fetch("https://app.ais.team/api/ImageSearchService/getRandomCuratedImageUrls?count=1")
+      .then(r => r.json())
+      .then(urls => {
+        const url = Array.isArray(urls) ? urls[0] : urls;
+        if (!url) return;
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          _bgRawImg = img;
+          fitImageToScreen(img);
+        };
+        img.src = url;
+      })
+      .catch(() => { /* silently fall back to white circles */ });
+  }
+
+  window.addEventListener("resize", () => {
+    if (_bgRawImg) fitImageToScreen(_bgRawImg);
+  });
+  loadBackgroundImage();
+
+  /** Sample the background image colour at (px, py) screen coords */
+  function sampleBgColor(px, py) {
+    if (!bgImageData) return null;
+    const x = Math.round(Math.min(Math.max(px, 0), bgImageW - 1));
+    const y = Math.round(Math.min(Math.max(py, 0), bgImageH - 1));
+    const idx = (y * bgImageW + x) * 4;
+    return { r: bgImageData[idx], g: bgImageData[idx + 1], b: bgImageData[idx + 2] };
+  }
+
   // ── State ─────────────────────────────────────────────────────
   let drops = [];
   // Per-column spawn cooldowns to prevent synchronised bursts
   let columnCooldowns = [];
+
+  // Alternating column parity for hex-grid spawning in continuous mode
+  let spawnParity = 0; // 0 = even columns, 1 = odd columns
+  let spawnParityTimer = 0;
 
   // Track how many active drops per column for spawn-limiting
   function dropsInColumn(ci) {
@@ -346,7 +427,21 @@
     while (columnCooldowns.length < cols) columnCooldowns.push(randomCooldown());
 
     // Spawn new drops with per-column cooldowns
+    // In continuous mode, alternate between even/odd columns for hex-grid spacing
+    const SPAWN_PARITY_INTERVAL = 60; // frames between parity switches
+    if (settings.continuousHead) {
+      spawnParityTimer += 1;
+      if (spawnParityTimer >= SPAWN_PARITY_INTERVAL) {
+        spawnParityTimer = 0;
+        spawnParity = 1 - spawnParity;
+      }
+    }
+
     for (let c = 0; c < cols; c++) {
+      // In continuous mode, only spawn in columns matching current parity
+      if (settings.continuousHead && (c % 2) !== spawnParity) {
+        continue;
+      }
       if (columnCooldowns[c] > 0) {
         columnCooldowns[c]--;
         continue;
