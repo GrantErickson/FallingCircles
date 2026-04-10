@@ -337,7 +337,8 @@
   function loadBackgroundImage() {
     fetch("https://app.ais.team/api/ImageSearchService/getRandomCuratedImageUrls?count=1")
       .then(r => r.json())
-      .then(urls => {
+      .then(data => {
+        const urls = data?.wasSuccessful && data.object ? data.object : data;
         const url = Array.isArray(urls) ? urls[0] : urls;
         if (!url) return;
         const img = new Image();
