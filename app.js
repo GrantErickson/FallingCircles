@@ -35,6 +35,7 @@
     headScaleMin: 0.3,   // minimum scale when head first appears at new row
     headFadeMin: 0.4,    // minimum opacity when head first appears at new row
     trailBrightness: 1,  // brightness of image-colored trail circles (0=dark, 1=normal, 2=bright)
+    trailDim: false,     // whether trail circles fade (dim) in addition to shrinking
   };
 
   // Wire up UI controls
@@ -57,6 +58,14 @@
   document.querySelectorAll('input[name="mouseEffect"]').forEach(r => {
     r.addEventListener("change", () => { settings.mouseEffect = r.value; });
   });
+
+  // Trail dim checkbox
+  const trailDimEl = document.getElementById("trailDim");
+  if (trailDimEl) {
+    trailDimEl.addEventListener("change", () => {
+      settings.trailDim = trailDimEl.checked;
+    });
+  }
 
   // Continuous head checkbox
   const continuousHeadEl = document.getElementById("continuousHead");
@@ -231,7 +240,7 @@
         const t = (i + 1) / (trailLen + 1); // 0→1 approaching head
         const tCurve = t * t; // power curve: more circles stay small/faint
         const circleR = r * (0.1 + 0.9 * tCurve);
-        const alpha = 0.05 + 0.6 * tCurve;
+        const alpha = settings.trailDim ? (0.05 + 0.6 * tCurve) : 0.65;
 
         const mi = this._mouseInfluence(this.x, ty);
         const finalAlpha = alpha * (mi.freeze < 1 ? Math.max(mi.freeze, 0.3) : 1) + mi.extra;
