@@ -236,14 +236,11 @@
 
         const drawX = this.x + mi.dx;
         const drawY = ty + mi.dy;
-        const sc = sampleColor(this.x, ty);
 
         ctx.beginPath();
         ctx.arc(drawX, drawY, Math.max(circleR, 1), 0, Math.PI * 2);
         if (mi.hue >= 0) {
           ctx.fillStyle = `hsla(${mi.hue}, 80%, 70%, ${finalAlpha})`;
-        } else if (sc) {
-          ctx.fillStyle = `rgba(${sc.r},${sc.g},${sc.b},${finalAlpha})`;
         } else {
           ctx.fillStyle = `rgba(255,255,255,${finalAlpha})`;
         }
@@ -252,8 +249,7 @@
         if (effect === "glow" && mi.influence > 0) {
           ctx.beginPath();
           ctx.arc(drawX, drawY, circleR * 1.6, 0, Math.PI * 2);
-          const gc = sc || { r: 255, g: 255, b: 255 };
-          ctx.fillStyle = `rgba(${gc.r},${gc.g},${gc.b},${mi.influence * 0.08})`;
+          ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.08})`;
           ctx.fill();
         }
       }
@@ -289,14 +285,11 @@
 
       const mi = this._mouseInfluence(this.x, headY);
       const headAlpha = headFade * (0.95 + mi.extra);
-      const hsc = sampleColor(this.x, headY);
 
       ctx.beginPath();
       ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale, 0, Math.PI * 2);
       if (mi.hue >= 0) {
         ctx.fillStyle = `hsla(${mi.hue}, 90%, 80%, ${headAlpha})`;
-      } else if (hsc) {
-        ctx.fillStyle = `rgba(${hsc.r},${hsc.g},${hsc.b},${headAlpha})`;
       } else {
         ctx.fillStyle = `rgba(255,255,255,${headAlpha})`;
       }
@@ -305,8 +298,7 @@
       if (effect === "glow" && mi.influence > 0) {
         ctx.beginPath();
         ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale * 2.2, 0, Math.PI * 2);
-        const hgc = hsc || { r: 255, g: 255, b: 255 };
-        ctx.fillStyle = `rgba(${hgc.r},${hgc.g},${hgc.b},${mi.influence * 0.12})`;
+        ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.12})`;
         ctx.fill();
       }
     }
@@ -314,7 +306,6 @@
 
   // ── Background image for circle coloring ──────────────────────
   let bgImage = null;       // offscreen canvas with cover-fitted image
-  let bgImageData = null;   // ImageData for fast pixel sampling
   let _bgRawImg = null;
 
   function fitImageToScreen(img) {
@@ -344,22 +335,6 @@
     }
     octx.drawImage(img, drawX, drawY, drawW, drawH);
     bgImage = offscreen;
-    try {
-      bgImageData = octx.getImageData(0, 0, sw, sh);
-    } catch (e) {
-      bgImageData = null;
-    }
-  }
-
-  /* Sample pixel color from the background image at (x, y).
-     Returns an {r, g, b} object, or null when no image is loaded. */
-  function sampleColor(x, y) {
-    if (!bgImageData) return null;
-    const ix = Math.round(x);
-    const iy = Math.round(y);
-    if (ix < 0 || iy < 0 || ix >= bgImageData.width || iy >= bgImageData.height) return null;
-    const off = (iy * bgImageData.width + ix) * 4;
-    return { r: bgImageData.data[off], g: bgImageData.data[off + 1], b: bgImageData.data[off + 2] };
   }
 
   function loadBackgroundImage() {
@@ -370,7 +345,6 @@
         const url = Array.isArray(urls) ? urls[0] : urls;
         if (!url) return;
         const img = new Image();
-        img.crossOrigin = "anonymous";
         img.onload = () => {
           _bgRawImg = img;
           fitImageToScreen(img);
@@ -441,7 +415,7 @@
     ctx.scale(devicePixelRatio, devicePixelRatio);
     ctx.clearRect(0, 0, W(), H());
 
-    // Background image is NOT drawn directly; circles sample their color from it.
+    // Background image is NOT drawn directly; circles are composited with it.
 
     const cols = columnCount();
 
@@ -506,6 +480,14 @@
         d.update();
       }
       d.draw(ctx);
+    }
+
+    // Composite background image through drawn circles so each circle
+    // shows the image color at its position (avoids getImageData / CORS).
+    if (bgImage) {
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.drawImage(bgImage, 0, 0, W(), H());
+      ctx.globalCompositeOperation = "source-over";
     }
 
     // Prune dead drops
