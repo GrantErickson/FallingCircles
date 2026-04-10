@@ -34,13 +34,15 @@
     headSmoothing: 0.8,  // 0 = snap to grid row, 1 = fully interpolated glide
     headScaleMin: 0.3,   // minimum scale when head first appears at new row
     headFadeMin: 0.4,    // minimum opacity when head first appears at new row
+    trailBrightness: 1,  // brightness of image-colored trail circles (0=dark, 1=normal, 2=bright)
   };
 
   // Wire up UI controls
   const sliders = [
     "circleRadius", "fallSpeed", "spawnRate",
     "trailLength", "maxPerColumn", "gap", "mouseRadius",
-    "headSmoothing", "headScaleMin", "headFadeMin"
+    "headSmoothing", "headScaleMin", "headFadeMin",
+    "trailBrightness"
   ];
   sliders.forEach(id => {
     const el = document.getElementById(id);
@@ -493,6 +495,19 @@
     if (bgImage) {
       ctx.globalCompositeOperation = "source-atop";
       ctx.drawImage(bgImage, 0, 0, W(), H());
+
+      // Adjust brightness of image-colored trail circles
+      const brightness = settings.trailBrightness;
+      if (brightness < 1) {
+        const darkenAmount = 1 - brightness;
+        ctx.fillStyle = `rgba(0,0,0,${darkenAmount})`;
+        ctx.fillRect(0, 0, W(), H());
+      } else if (brightness > 1) {
+        const brightenAmount = Math.min(brightness - 1, 1);
+        ctx.fillStyle = `rgba(255,255,255,${brightenAmount})`;
+        ctx.fillRect(0, 0, W(), H());
+      }
+
       ctx.globalCompositeOperation = "source-over";
     }
 
