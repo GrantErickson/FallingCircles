@@ -91,6 +91,19 @@ canvas {
   font-size: 12px;
 }
 
+.checkbox-label {
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  accent-color: #888;
+}
+
 .radio-group {
   display: flex;
   flex-direction: column;
