@@ -24,9 +24,9 @@
   const settings = {
     circleRadius: 8,
     fallSpeed: 2,
-    spawnRate: 0.04,     // probability per column per frame
-    trailLength: 12,
-    maxPerColumn: 3,
+    spawnRate: 0.025,    // probability per column per frame
+    trailLength: 20,
+    maxPerColumn: 5,
     gap: 2,              // px gap between adjacent circles
     mouseEffect: "glow",
     mouseRadius: 120,
@@ -87,14 +87,18 @@
     return settings.circleRadius * 2 + settings.gap;
   }
 
+  // ── Spawn cooldown range (frames) to stagger column spawns ────
+  const COOLDOWN_MIN = 30;
+  const COOLDOWN_MAX = 90;
+  function randomCooldown() {
+    return COOLDOWN_MIN + Math.floor(Math.random() * (COOLDOWN_MAX - COOLDOWN_MIN));
+  }
+
   // ── Circle (drop) class ───────────────────────────────────────
   class Drop {
-    constructor(colIndex) {
+    constructor(colIndex, startRow) {
       this.col = colIndex;
       this.x = columnX(colIndex);
-      this.row = -1;                // current grid row (0 = top visible row)
-      this.y = -rowStep();          // pixel y of the leading circle
-      this.trail = [];              // array of grid-row y positions visited
       this.alive = true;
       // frame counter for quantized movement
       this.tickCounter = 0;
@@ -102,6 +106,27 @@
       this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
       // slight variation for organic feel
       this.tickInterval += Math.floor(Math.random() * 3) - 1;
+      // randomise starting tick so drops in different columns don't step in sync
+      this.tickCounter = Math.floor(Math.random() * this.tickInterval);
+
+      if (startRow !== undefined && startRow !== null) {
+        // Pre-seeded drop: place at a specific row with a partial trail
+        this.row = startRow;
+        this.y = startRow * rowStep();
+        // Build a trail of preceding rows (only non-negative rows)
+        const trailLen = Math.min(
+          settings.trailLength,
+          Math.max(0, startRow)  // can't trail above row 0
+        );
+        this.trail = [];
+        for (let r = startRow - trailLen; r < startRow; r++) {
+          this.trail.push(r * rowStep());
+        }
+      } else {
+        this.row = -1;                // current grid row (0 = top visible row)
+        this.y = -rowStep();          // pixel y of the leading circle
+        this.trail = [];              // array of grid-row y positions visited
+      }
     }
 
     update() {
@@ -165,11 +190,11 @@
       for (let i = 0; i < trailLen; i++) {
         const ty = this.trail[i] + yOff;
         // i=0 is oldest/top, i=trailLen-1 is newest (just behind head)
-        // Head is at this.y which is trail[trailLen-1] or newer
-        // Scale: oldest = smallest, newest trail = second largest
+        // Scale: use a power curve so more circles are small/faded at the tail
         const t = (i + 1) / (trailLen + 1); // 0→1 approaching head
-        const circleR = r * (0.2 + 0.8 * t);
-        const alpha = 0.15 + 0.55 * t;
+        const tCurve = t * t; // power curve: more circles stay small/faint
+        const circleR = r * (0.1 + 0.9 * tCurve);
+        const alpha = 0.05 + 0.6 * tCurve;
 
         const mi = this._mouseInfluence(this.x, ty);
         const finalAlpha = alpha * (mi.freeze < 1 ? Math.max(mi.freeze, 0.3) : 1) + mi.extra;
@@ -191,13 +216,20 @@
         }
       }
 
-      // Draw leading (head) circle – the largest
+      // Draw leading (head) circle – expand quickly from small to full size
+      // tickProgress goes from 0 (just moved) to 1 (about to move again)
+      const tickProgress = Math.min(this.tickCounter / Math.max(this.tickInterval - 1, 1), 1);
+      // Fast ease-out curve: reaches ~90% size within first 30% of interval
+      const ease = 1 - Math.pow(1 - tickProgress, 3);
+      const headScale = 0.3 + 0.7 * ease;
+      const headFade = 0.4 + 0.6 * ease;
+
       const headY = this.y + yOff;
       const mi = this._mouseInfluence(this.x, headY);
-      const headAlpha = 0.95 + mi.extra;
+      const headAlpha = headFade * (0.95 + mi.extra);
 
       ctx.beginPath();
-      ctx.arc(this.x + mi.dx, headY + mi.dy, r, 0, Math.PI * 2);
+      ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale, 0, Math.PI * 2);
       if (mi.hue >= 0) {
         ctx.fillStyle = `hsla(${mi.hue}, 90%, 80%, ${headAlpha})`;
       } else {
@@ -207,7 +239,7 @@
 
       if (effect === "glow" && mi.influence > 0) {
         ctx.beginPath();
-        ctx.arc(this.x + mi.dx, headY + mi.dy, r * 2.2, 0, Math.PI * 2);
+        ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale * 2.2, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.12})`;
         ctx.fill();
       }
@@ -216,12 +248,33 @@
 
   // ── State ─────────────────────────────────────────────────────
   let drops = [];
+  // Per-column spawn cooldowns to prevent synchronised bursts
+  let columnCooldowns = [];
+
   // Track how many active drops per column for spawn-limiting
   function dropsInColumn(ci) {
     let n = 0;
     for (const d of drops) if (d.col === ci) n++;
     return n;
   }
+
+  // ── Pre-seed the screen so it starts looking populated ────────
+  function seedDrops() {
+    const cols = columnCount();
+    const maxRow = Math.ceil(H() / rowStep());
+    columnCooldowns = new Array(cols).fill(0);
+
+    for (let c = 0; c < cols; c++) {
+      // Randomly decide how many drops to pre-place in this column (0 to maxPerColumn)
+      const count = Math.floor(Math.random() * (settings.maxPerColumn + 1));
+      for (let n = 0; n < count; n++) {
+        const startRow = Math.floor(Math.random() * maxRow);
+        drops.push(new Drop(c, startRow));
+      }
+      columnCooldowns[c] = randomCooldown();
+    }
+  }
+  seedDrops();
 
   // ── Burst effect bookkeeping ──────────────────────────────────
   let burstCooldown = 0;
@@ -234,10 +287,18 @@
 
     const cols = columnCount();
 
-    // Spawn new drops
+    // Ensure cooldown array matches column count (e.g. after resize)
+    while (columnCooldowns.length < cols) columnCooldowns.push(randomCooldown());
+
+    // Spawn new drops with per-column cooldowns
     for (let c = 0; c < cols; c++) {
+      if (columnCooldowns[c] > 0) {
+        columnCooldowns[c]--;
+        continue;
+      }
       if (dropsInColumn(c) < settings.maxPerColumn && Math.random() < settings.spawnRate) {
         drops.push(new Drop(c));
+        columnCooldowns[c] = randomCooldown();
       }
     }
 
