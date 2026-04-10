@@ -30,12 +30,16 @@
     gap: 2,              // px gap between adjacent circles
     mouseEffect: "glow",
     mouseRadius: 120,
+    headSmoothing: 0.8,  // 0 = snap to grid row, 1 = fully interpolated glide
+    headScaleMin: 0.3,   // minimum scale when head first appears at new row
+    headFadeMin: 0.4,    // minimum opacity when head first appears at new row
   };
 
   // Wire up UI controls
   const sliders = [
     "circleRadius", "fallSpeed", "spawnRate",
-    "trailLength", "maxPerColumn", "gap", "mouseRadius"
+    "trailLength", "maxPerColumn", "gap", "mouseRadius",
+    "headSmoothing", "headScaleMin", "headFadeMin"
   ];
   sliders.forEach(id => {
     const el = document.getElementById(id);
@@ -221,10 +225,17 @@
       const tickProgress = Math.min(this.tickCounter / Math.max(this.tickInterval - 1, 1), 1);
       // Fast ease-out curve: reaches ~90% size within first 30% of interval
       const ease = 1 - Math.pow(1 - tickProgress, 3);
-      const headScale = 0.3 + 0.7 * ease;
-      const headFade = 0.4 + 0.6 * ease;
+      const scaleMin = settings.headScaleMin;
+      const fadeMin = settings.headFadeMin;
+      const headScale = scaleMin + (1 - scaleMin) * ease;
+      const headFade = fadeMin + (1 - fadeMin) * ease;
 
-      const headY = this.y + yOff;
+      // Smooth position interpolation between previous and current grid row
+      const smoothing = settings.headSmoothing;
+      const prevRowY = (this.row - 1) * rowStep();
+      const currRowY = this.row * rowStep();
+      const interpY = prevRowY + (currRowY - prevRowY) * (1 - smoothing + smoothing * ease);
+      const headY = interpY + yOff;
       const mi = this._mouseInfluence(this.x, headY);
       const headAlpha = headFade * (0.95 + mi.extra);
 
