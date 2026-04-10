@@ -30,6 +30,7 @@
     gap: 2,              // px gap between adjacent circles
     mouseEffect: "glow",
     mouseRadius: 120,
+    continuousHead: false, // head falls continuously without smoothing
     headSmoothing: 0.8,  // 0 = snap to grid row, 1 = fully interpolated glide
     headScaleMin: 0.3,   // minimum scale when head first appears at new row
     headFadeMin: 0.4,    // minimum opacity when head first appears at new row
@@ -54,6 +55,14 @@
   document.querySelectorAll('input[name="mouseEffect"]').forEach(r => {
     r.addEventListener("change", () => { settings.mouseEffect = r.value; });
   });
+
+  // Continuous head checkbox
+  const continuousHeadEl = document.getElementById("continuousHead");
+  if (continuousHeadEl) {
+    continuousHeadEl.addEventListener("change", () => {
+      settings.continuousHead = continuousHeadEl.checked;
+    });
+  }
 
   // Settings panel toggle
   document.getElementById("settingsToggle").addEventListener("click", () => {
@@ -117,6 +126,7 @@
         // Pre-seeded drop: place at a specific row with a partial trail
         this.row = startRow;
         this.y = startRow * rowStep();
+        this.continuousY = this.y;   // pixel-level y for continuous mode
         // Build a trail of preceding rows (only non-negative rows)
         const trailLen = Math.min(
           settings.trailLength,
@@ -129,28 +139,49 @@
       } else {
         this.row = -1;                // current grid row (0 = top visible row)
         this.y = -rowStep();          // pixel y of the leading circle
+        this.continuousY = this.y;    // pixel-level y for continuous mode
         this.trail = [];              // array of grid-row y positions visited
       }
     }
 
     update() {
-      this.tickCounter++;
-      if (this.tickCounter >= this.tickInterval) {
-        this.tickCounter = 0;
-        // Advance one grid row
-        this.row++;
-        this.y = this.row * rowStep();
+      if (settings.continuousHead) {
+        // Continuous mode: head moves every frame by a pixel speed
+        const speed = settings.fallSpeed * 1.2;
+        this.continuousY += speed;
 
-        // Push current position into trail (trail stores y values)
-        this.trail.push(this.y);
-        if (this.trail.length > settings.trailLength) this.trail.shift();
+        // Check if we crossed into a new grid row
+        const step = rowStep();
+        const nextRowY = (this.row + 1) * step;
+        if (this.continuousY >= nextRowY) {
+          this.row++;
+          this.y = this.row * step;
 
-        // Recalculate tick interval in case fallSpeed changed
-        this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
+          // Leave a quantized trail circle at this grid position
+          this.trail.push(this.y);
+          if (this.trail.length > settings.trailLength) this.trail.shift();
+        }
+      } else {
+        // Original quantized mode
+        this.tickCounter++;
+        if (this.tickCounter >= this.tickInterval) {
+          this.tickCounter = 0;
+          // Advance one grid row
+          this.row++;
+          this.y = this.row * rowStep();
+
+          // Push current position into trail (trail stores y values)
+          this.trail.push(this.y);
+          if (this.trail.length > settings.trailLength) this.trail.shift();
+
+          // Recalculate tick interval in case fallSpeed changed
+          this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
+        }
       }
 
       // Off screen? (leading circle plus trail all off-screen)
-      const trailTop = this.trail.length > 0 ? this.trail[0] : this.y;
+      const headPos = settings.continuousHead ? this.continuousY : this.y;
+      const trailTop = this.trail.length > 0 ? this.trail[0] : headPos;
       if (trailTop > H() + rowStep() * 2) {
         this.alive = false;
       }
@@ -220,22 +251,35 @@
         }
       }
 
-      // Draw leading (head) circle – expand quickly from small to full size
-      // tickProgress goes from 0 (just moved) to 1 (about to move again)
-      const tickProgress = Math.min(this.tickCounter / Math.max(this.tickInterval - 1, 1), 1);
-      // Fast ease-out curve: reaches ~90% size within first 30% of interval
-      const ease = 1 - Math.pow(1 - tickProgress, 3);
-      const scaleMin = settings.headScaleMin;
-      const fadeMin = settings.headFadeMin;
-      const headScale = scaleMin + (1 - scaleMin) * ease;
-      const headFade = fadeMin + (1 - fadeMin) * ease;
+      // Draw leading (head) circle
+      let headY;
+      let headScale;
+      let headFade;
 
-      // Smooth position interpolation between previous and current grid row
-      const smoothing = settings.headSmoothing;
-      const prevRowY = (this.row - 1) * rowStep();
-      const currRowY = this.row * rowStep();
-      const interpY = prevRowY + (currRowY - prevRowY) * (1 - smoothing + smoothing * ease);
-      const headY = interpY + yOff;
+      if (settings.continuousHead) {
+        // Continuous mode: draw at exact pixel position, full size, no smoothing
+        headY = this.continuousY + yOff;
+        headScale = 1;
+        headFade = 1;
+      } else {
+        // Original quantized mode with smoothing/scaling
+        // tickProgress goes from 0 (just moved) to 1 (about to move again)
+        const tickProgress = Math.min(this.tickCounter / Math.max(this.tickInterval - 1, 1), 1);
+        // Fast ease-out curve: reaches ~90% size within first 30% of interval
+        const ease = 1 - Math.pow(1 - tickProgress, 3);
+        const scaleMin = settings.headScaleMin;
+        const fadeMin = settings.headFadeMin;
+        headScale = scaleMin + (1 - scaleMin) * ease;
+        headFade = fadeMin + (1 - fadeMin) * ease;
+
+        // Smooth position interpolation between previous and current grid row
+        const smoothing = settings.headSmoothing;
+        const prevRowY = (this.row - 1) * rowStep();
+        const currRowY = this.row * rowStep();
+        const interpY = prevRowY + (currRowY - prevRowY) * (1 - smoothing + smoothing * ease);
+        headY = interpY + yOff;
+      }
+
       const mi = this._mouseInfluence(this.x, headY);
       const headAlpha = headFade * (0.95 + mi.extra);
 
