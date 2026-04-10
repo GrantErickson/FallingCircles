@@ -347,7 +347,7 @@
     bgImageData = octx.getImageData(0, 0, sw, sh);
   }
 
-  /* Sample pixel colour from the background image at (x, y).
+  /* Sample pixel color from the background image at (x, y).
      Returns an {r, g, b} object, or null when no image is loaded. */
   function sampleColor(x, y) {
     if (!bgImageData) return null;
@@ -423,7 +423,7 @@
     ctx.scale(devicePixelRatio, devicePixelRatio);
     ctx.clearRect(0, 0, W(), H());
 
-    // Background image is NOT drawn directly; circles sample their colour from it.
+    // Background image is NOT drawn directly; circles sample their color from it.
 
     const cols = columnCount();
 
