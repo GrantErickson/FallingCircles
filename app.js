@@ -25,7 +25,7 @@
     circleRadius: 8,
     fallSpeed: 2,
     spawnRate: 0.04,     // probability per column per frame
-    trailLength: 12,
+    trailLength: 20,
     maxPerColumn: 3,
     gap: 2,              // px gap between adjacent circles
     mouseEffect: "glow",
@@ -165,11 +165,11 @@
       for (let i = 0; i < trailLen; i++) {
         const ty = this.trail[i] + yOff;
         // i=0 is oldest/top, i=trailLen-1 is newest (just behind head)
-        // Head is at this.y which is trail[trailLen-1] or newer
-        // Scale: oldest = smallest, newest trail = second largest
+        // Scale: use a power curve so more circles are small/faded at the tail
         const t = (i + 1) / (trailLen + 1); // 0→1 approaching head
-        const circleR = r * (0.2 + 0.8 * t);
-        const alpha = 0.15 + 0.55 * t;
+        const tCurve = t * t; // power curve: more circles stay small/faint
+        const circleR = r * (0.1 + 0.9 * tCurve);
+        const alpha = 0.05 + 0.6 * tCurve;
 
         const mi = this._mouseInfluence(this.x, ty);
         const finalAlpha = alpha * (mi.freeze < 1 ? Math.max(mi.freeze, 0.3) : 1) + mi.extra;
@@ -191,13 +191,20 @@
         }
       }
 
-      // Draw leading (head) circle – the largest
+      // Draw leading (head) circle – expand quickly from small to full size
+      // tickProgress goes from 0 (just moved) to 1 (about to move again)
+      const tickProgress = Math.min(this.tickCounter / Math.max(this.tickInterval - 1, 1), 1);
+      // Fast ease-out curve: reaches ~90% size within first 30% of interval
+      const ease = 1 - Math.pow(1 - tickProgress, 3);
+      const headScale = 0.3 + 0.7 * ease;
+      const headFade = 0.4 + 0.6 * ease;
+
       const headY = this.y + yOff;
       const mi = this._mouseInfluence(this.x, headY);
-      const headAlpha = 0.95 + mi.extra;
+      const headAlpha = headFade * (0.95 + mi.extra);
 
       ctx.beginPath();
-      ctx.arc(this.x + mi.dx, headY + mi.dy, r, 0, Math.PI * 2);
+      ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale, 0, Math.PI * 2);
       if (mi.hue >= 0) {
         ctx.fillStyle = `hsla(${mi.hue}, 90%, 80%, ${headAlpha})`;
       } else {
@@ -207,7 +214,7 @@
 
       if (effect === "glow" && mi.influence > 0) {
         ctx.beginPath();
-        ctx.arc(this.x + mi.dx, headY + mi.dy, r * 2.2, 0, Math.PI * 2);
+        ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale * 2.2, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.12})`;
         ctx.fill();
       }
