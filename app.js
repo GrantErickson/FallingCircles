@@ -239,13 +239,7 @@
         if (mi.hue >= 0) {
           ctx.fillStyle = `hsla(${mi.hue}, 80%, 70%, ${finalAlpha})`;
         } else {
-          // Sample colour from the background image if available
-          const bgC = sampleBgColor(this.x + mi.dx, ty + mi.dy);
-          if (bgC) {
-            ctx.fillStyle = `rgba(${bgC.r},${bgC.g},${bgC.b},${finalAlpha})`;
-          } else {
-            ctx.fillStyle = `rgba(255,255,255,${finalAlpha})`;
-          }
+          ctx.fillStyle = `rgba(255,255,255,${finalAlpha})`;
         }
         ctx.fill();
 
@@ -307,18 +301,13 @@
     }
   }
 
-  // ── Background image for trail colour sampling ──────────────
+  // ── Background image for canvas background ───────────────────
   let bgImage = null;       // offscreen canvas with cover-fitted image
-  let bgImageW = 0;
-  let bgImageH = 0;
-  let bgImageData = null;  // cached Uint8ClampedArray of pixel data
   let _bgRawImg = null;
 
   function fitImageToScreen(img) {
     const sw = W();
     const sh = H();
-    bgImageW = sw;
-    bgImageH = sh;
     const offscreen = document.createElement("canvas");
     offscreen.width = sw;
     offscreen.height = sh;
@@ -343,8 +332,6 @@
     }
     octx.drawImage(img, drawX, drawY, drawW, drawH);
     bgImage = offscreen;
-    // Cache full pixel data for fast per-pixel sampling
-    bgImageData = octx.getImageData(0, 0, sw, sh).data;
   }
 
   function loadBackgroundImage() {
@@ -354,7 +341,6 @@
         const url = Array.isArray(urls) ? urls[0] : urls;
         if (!url) return;
         const img = new Image();
-        img.crossOrigin = "anonymous";
         img.onload = () => {
           _bgRawImg = img;
           fitImageToScreen(img);
@@ -368,15 +354,6 @@
     if (_bgRawImg) fitImageToScreen(_bgRawImg);
   });
   loadBackgroundImage();
-
-  /** Sample the background image colour at (px, py) screen coords */
-  function sampleBgColor(px, py) {
-    if (!bgImageData) return null;
-    const x = Math.round(Math.min(Math.max(px, 0), bgImageW - 1));
-    const y = Math.round(Math.min(Math.max(py, 0), bgImageH - 1));
-    const idx = (y * bgImageW + x) * 4;
-    return { r: bgImageData[idx], g: bgImageData[idx + 1], b: bgImageData[idx + 2] };
-  }
 
   // ── State ─────────────────────────────────────────────────────
   let drops = [];
@@ -420,6 +397,11 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(devicePixelRatio, devicePixelRatio);
     ctx.clearRect(0, 0, W(), H());
+
+    // Draw background image as canvas background when available
+    if (bgImage) {
+      ctx.drawImage(bgImage, 0, 0, W(), H());
+    }
 
     const cols = columnCount();
 
