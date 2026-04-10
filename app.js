@@ -99,7 +99,7 @@
       // frame counter for quantized movement
       this.tickCounter = 0;
       // ticks between each grid step (derived from fallSpeed)
-      this.tickInterval = Math.max(2, Math.round(12 / settings.fallSpeed));
+      this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
       // slight variation for organic feel
       this.tickInterval += Math.floor(Math.random() * 3) - 1;
     }
@@ -117,7 +117,7 @@
         if (this.trail.length > settings.trailLength) this.trail.shift();
 
         // Recalculate tick interval in case fallSpeed changed
-        this.tickInterval = Math.max(2, Math.round(12 / settings.fallSpeed));
+        this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
       }
 
       // Off screen? (leading circle plus trail all off-screen)
@@ -266,9 +266,7 @@
         const dist = Math.hypot(d.x - mouse.x, (d.y + yOff) - mouse.y);
         const mr = settings.mouseRadius;
         const influence = dist < mr ? 1 - dist / mr : 0;
-        if (influence > 0.5 && Math.random() < influence * 0.9) {
-          // Skip this tick to simulate freezing
-        } else {
+        if (!(influence > 0.5 && Math.random() < influence * 0.9)) {
           d.update();
         }
       } else {
