@@ -2,17 +2,7 @@
 
 A mesmerizing, interactive canvas animation of circles cascading down tightly-packed columns. Built with vanilla HTML, CSS, and JavaScript — no frameworks or build steps required.
 
-## ▶ Live Demo
-
-Because the project is pure static HTML you can open it directly in your browser — **no server or deployment needed**:
-
-1. Clone or download this repository.
-2. Open **`index.html`** in any modern browser (Chrome, Firefox, Edge, Safari).
-
-> **GitHub Pages** – If you'd like a shareable link, enable GitHub Pages on the `main` (or this) branch. The page will be served at  
-> `https://<username>.github.io/FallingCircles/`
-
-> **Other free hosts:** [Netlify Drop](https://app.netlify.com/drop), [Vercel](https://vercel.com), or [Cloudflare Pages](https://pages.cloudflare.com) all support drag-and-drop deployment of static sites.
+## 🚀 [Try it live on GitHub Pages!](https://granterickson.github.io/FallingCircles/)
 
 ---
 
@@ -74,3 +64,23 @@ FallingCircles/
 * Uses the **Canvas 2D API** for rendering; runs at 60 fps on modern hardware.
 * Responsive — automatically adjusts the column count and canvas size on window resize.
 * HiDPI / Retina aware (`devicePixelRatio` scaling).
+
+---
+
+## Running Locally
+
+Because the project is pure static HTML, no server or build step is needed:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/GrantErickson/FallingCircles.git
+   ```
+2. Open **`index.html`** in any modern browser (Chrome, Firefox, Edge, Safari):
+   ```bash
+   cd FallingCircles
+   open index.html        # macOS
+   xdg-open index.html    # Linux
+   start index.html       # Windows
+   ```
+
+That's it — no dependencies to install.
