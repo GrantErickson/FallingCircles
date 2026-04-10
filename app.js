@@ -34,6 +34,7 @@
     headSmoothing: 0.8,  // 0 = snap to grid row, 1 = fully interpolated glide
     headScaleMin: 0.3,   // minimum scale when head first appears at new row
     headFadeMin: 0.4,    // minimum opacity when head first appears at new row
+    colorTrailsWithImage: true, // color trailing circles with the background image
   };
 
   // Wire up UI controls
@@ -61,6 +62,14 @@
   if (continuousHeadEl) {
     continuousHeadEl.addEventListener("change", () => {
       settings.continuousHead = continuousHeadEl.checked;
+    });
+  }
+
+  // Color trails with image checkbox
+  const colorTrailsEl = document.getElementById("colorTrailsWithImage");
+  if (colorTrailsEl) {
+    colorTrailsEl.addEventListener("change", () => {
+      settings.colorTrailsWithImage = colorTrailsEl.checked;
     });
   }
 
@@ -290,7 +299,7 @@
       }
 
       const mi = this._mouseInfluence(this.x, headY);
-      const headAlpha = headFade * (0.95 + mi.extra);
+      const headAlpha = Math.min(headFade * (1.0 + mi.extra), 1.0);
 
       ctx.beginPath();
       ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale, 0, Math.PI * 2);
@@ -490,7 +499,7 @@
 
     // Composite background image through trail circles so each trail circle
     // shows the image color at its position (avoids getImageData / CORS).
-    if (bgImage) {
+    if (bgImage && settings.colorTrailsWithImage) {
       ctx.globalCompositeOperation = "source-atop";
       ctx.drawImage(bgImage, 0, 0, W(), H());
       ctx.globalCompositeOperation = "source-over";
