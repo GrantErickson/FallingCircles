@@ -24,9 +24,9 @@
   const settings = {
     circleRadius: 8,
     fallSpeed: 2,
-    spawnRate: 0.04,     // probability per column per frame
+    spawnRate: 0.025,    // probability per column per frame
     trailLength: 20,
-    maxPerColumn: 3,
+    maxPerColumn: 5,
     gap: 2,              // px gap between adjacent circles
     mouseEffect: "glow",
     mouseRadius: 120,
@@ -87,14 +87,18 @@
     return settings.circleRadius * 2 + settings.gap;
   }
 
+  // ── Spawn cooldown range (frames) to stagger column spawns ────
+  const COOLDOWN_MIN = 30;
+  const COOLDOWN_MAX = 90;
+  function randomCooldown() {
+    return COOLDOWN_MIN + Math.floor(Math.random() * (COOLDOWN_MAX - COOLDOWN_MIN));
+  }
+
   // ── Circle (drop) class ───────────────────────────────────────
   class Drop {
-    constructor(colIndex) {
+    constructor(colIndex, startRow) {
       this.col = colIndex;
       this.x = columnX(colIndex);
-      this.row = -1;                // current grid row (0 = top visible row)
-      this.y = -rowStep();          // pixel y of the leading circle
-      this.trail = [];              // array of grid-row y positions visited
       this.alive = true;
       // frame counter for quantized movement
       this.tickCounter = 0;
@@ -102,6 +106,27 @@
       this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
       // slight variation for organic feel
       this.tickInterval += Math.floor(Math.random() * 3) - 1;
+      // randomise starting tick so drops in different columns don't step in sync
+      this.tickCounter = Math.floor(Math.random() * this.tickInterval);
+
+      if (startRow !== undefined && startRow !== null) {
+        // Pre-seeded drop: place at a specific row with a partial trail
+        this.row = startRow;
+        this.y = startRow * rowStep();
+        // Build a trail of preceding rows (only non-negative rows)
+        const trailLen = Math.min(
+          settings.trailLength,
+          Math.max(0, startRow)  // can't trail above row 0
+        );
+        this.trail = [];
+        for (let r = startRow - trailLen; r < startRow; r++) {
+          this.trail.push(r * rowStep());
+        }
+      } else {
+        this.row = -1;                // current grid row (0 = top visible row)
+        this.y = -rowStep();          // pixel y of the leading circle
+        this.trail = [];              // array of grid-row y positions visited
+      }
     }
 
     update() {
@@ -223,12 +248,33 @@
 
   // ── State ─────────────────────────────────────────────────────
   let drops = [];
+  // Per-column spawn cooldowns to prevent synchronised bursts
+  let columnCooldowns = [];
+
   // Track how many active drops per column for spawn-limiting
   function dropsInColumn(ci) {
     let n = 0;
     for (const d of drops) if (d.col === ci) n++;
     return n;
   }
+
+  // ── Pre-seed the screen so it starts looking populated ────────
+  function seedDrops() {
+    const cols = columnCount();
+    const maxRow = Math.ceil(H() / rowStep());
+    columnCooldowns = new Array(cols).fill(0);
+
+    for (let c = 0; c < cols; c++) {
+      // Randomly decide how many drops to pre-place in this column (0 to maxPerColumn)
+      const count = Math.floor(Math.random() * (settings.maxPerColumn + 1));
+      for (let n = 0; n < count; n++) {
+        const startRow = Math.floor(Math.random() * maxRow);
+        drops.push(new Drop(c, startRow));
+      }
+      columnCooldowns[c] = randomCooldown();
+    }
+  }
+  seedDrops();
 
   // ── Burst effect bookkeeping ──────────────────────────────────
   let burstCooldown = 0;
@@ -241,10 +287,18 @@
 
     const cols = columnCount();
 
-    // Spawn new drops
+    // Ensure cooldown array matches column count (e.g. after resize)
+    while (columnCooldowns.length < cols) columnCooldowns.push(randomCooldown());
+
+    // Spawn new drops with per-column cooldowns
     for (let c = 0; c < cols; c++) {
+      if (columnCooldowns[c] > 0) {
+        columnCooldowns[c]--;
+        continue;
+      }
       if (dropsInColumn(c) < settings.maxPerColumn && Math.random() < settings.spawnRate) {
         drops.push(new Drop(c));
+        columnCooldowns[c] = randomCooldown();
       }
     }
 
