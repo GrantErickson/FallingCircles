@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Falling Circles</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <!-- Settings Toggle Button -->
+  <button id="settingsToggle" title="Settings">⚙</button>
+
+  <!-- Settings Panel -->
+  <div id="settingsPanel" class="hidden">
+    <h2>Settings</h2>
+
+    <label>Circle Radius
+      <input type="range" id="circleRadius" min="3" max="20" value="8" step="1">
+      <span id="circleRadiusVal">8</span>
+    </label>
+
+    <label>Fall Speed
+      <input type="range" id="fallSpeed" min="0.5" max="6" value="2" step="0.25">
+      <span id="fallSpeedVal">2</span>
+    </label>
+
+    <label>Spawn Rate
+      <input type="range" id="spawnRate" min="0.005" max="0.15" value="0.04" step="0.005">
+      <span id="spawnRateVal">0.04</span>
+    </label>
+
+    <label>Trail Length
+      <input type="range" id="trailLength" min="3" max="30" value="12" step="1">
+      <span id="trailLengthVal">12</span>
+    </label>
+
+    <label>Max Circles per Column
+      <input type="range" id="maxPerColumn" min="1" max="8" value="3" step="1">
+      <span id="maxPerColumnVal">3</span>
+    </label>
+
+    <label>Gap Between Circles (px)
+      <input type="range" id="gap" min="1" max="8" value="2" step="1">
+      <span id="gapVal">2</span>
+    </label>
+
+    <h3>Mouse Effect</h3>
+    <div class="radio-group">
+      <label><input type="radio" name="mouseEffect" value="glow" checked> Glow – circles near cursor glow brighter</label>
+      <label><input type="radio" name="mouseEffect" value="repel"> Repel – circles push away from cursor</label>
+      <label><input type="radio" name="mouseEffect" value="attract"> Attract – circles pull toward cursor</label>
+      <label><input type="radio" name="mouseEffect" value="color"> Color Wave – circles near cursor shift hue</label>
+      <label><input type="radio" name="mouseEffect" value="freeze"> Freeze – circles near cursor slow/stop</label>
+      <label><input type="radio" name="mouseEffect" value="burst"> Burst – spawns extra circles near cursor</label>
+    </div>
+
+    <label>Mouse Effect Radius
+      <input type="range" id="mouseRadius" min="30" max="300" value="120" step="10">
+      <span id="mouseRadiusVal">120</span>
+    </label>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
