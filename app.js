@@ -215,7 +215,7 @@
       return { dx, dy, extra, hue, freeze, influence };
     }
 
-    draw(ctx) {
+    drawTrail(ctx) {
       const yOff = columnYOffset(this.col);
       const r = settings.circleRadius;
       const effect = settings.mouseEffect;
@@ -253,6 +253,12 @@
           ctx.fill();
         }
       }
+    }
+
+    drawHead(ctx) {
+      const yOff = columnYOffset(this.col);
+      const r = settings.circleRadius;
+      const effect = settings.mouseEffect;
 
       // Draw leading (head) circle
       let headY;
@@ -288,11 +294,7 @@
 
       ctx.beginPath();
       ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale, 0, Math.PI * 2);
-      if (mi.hue >= 0) {
-        ctx.fillStyle = `hsla(${mi.hue}, 90%, 80%, ${headAlpha})`;
-      } else {
-        ctx.fillStyle = `rgba(255,255,255,${headAlpha})`;
-      }
+      ctx.fillStyle = `rgba(255,255,255,${headAlpha})`;
       ctx.fill();
 
       if (effect === "glow" && mi.influence > 0) {
@@ -465,7 +467,7 @@
       }
     }
 
-    // Update & draw
+    // Update all drops
     for (const d of drops) {
       // If freeze effect, temporarily slow the tick counter
       if (settings.mouseEffect === "freeze") {
@@ -479,15 +481,24 @@
       } else {
         d.update();
       }
-      d.draw(ctx);
     }
 
-    // Composite background image through drawn circles so each circle
+    // Pass 1: Draw trail circles (these get image-colored)
+    for (const d of drops) {
+      d.drawTrail(ctx);
+    }
+
+    // Composite background image through trail circles so each trail circle
     // shows the image color at its position (avoids getImageData / CORS).
     if (bgImage) {
       ctx.globalCompositeOperation = "source-atop";
       ctx.drawImage(bgImage, 0, 0, W(), H());
       ctx.globalCompositeOperation = "source-over";
+    }
+
+    // Pass 2: Draw head circles on top (these stay white)
+    for (const d of drops) {
+      d.drawHead(ctx);
     }
 
     // Prune dead drops
