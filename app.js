@@ -434,23 +434,12 @@
     return true;
   }
 
-  // ── Pre-seed the screen so it starts looking populated ────────
-  function seedDrops() {
+  // ── Initialise column cooldowns ────────────────────────────────
+  function initCooldowns() {
     const cols = columnCount();
-    const maxRow = Math.ceil(H() / rowStep());
-    columnCooldowns = new Array(cols).fill(0);
-
-    for (let c = 0; c < cols; c++) {
-      // Randomly decide how many drops to pre-place in this column (0 to maxPerColumn)
-      const count = Math.floor(Math.random() * (settings.maxPerColumn + 1));
-      for (let n = 0; n < count; n++) {
-        const startRow = Math.floor(Math.random() * maxRow);
-        drops.push(new Drop(c, startRow));
-      }
-      columnCooldowns[c] = randomCooldown();
-    }
+    columnCooldowns = Array.from({ length: cols }, () => randomCooldown());
   }
-  seedDrops();
+  initCooldowns();
 
   // ── Burst effect bookkeeping ──────────────────────────────────
   let burstCooldown = 0;
