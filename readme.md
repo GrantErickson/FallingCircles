@@ -16,7 +16,8 @@ A mesmerizing, interactive canvas animation of circles cascading down tightly-pa
 | **Falling drops** | Circles spawn at the top of random columns and fall at a slightly randomised speed for an organic, harmonious feel. |
 | **Fading trail** | Each falling circle leaves a trail of smaller circles that progressively shrink and fade to transparent. |
 | **Multiple drops per column** | More than one circle can be active in the same column simultaneously, creating a busy-but-balanced look. |
-| **Dark theme** | Dark background (#0a0a0a) with white/light circles. |
+| **Image-colored trails** | Trail circles are colored by a background image fetched from a curated image API. The image rotates every 30 seconds with a smooth crossfade transition. |
+| **Dark theme** | Dark background (#0a0a0a) with white/light circles (or image-colored when a background image is loaded). |
 
 ### Adjustable Settings (⚙ panel)
 Click the **⚙** button in the top-right corner to open the settings panel. All changes take effect immediately.
@@ -29,20 +30,32 @@ Click the **⚙** button in the top-right corner to open the settings panel. All
 | **Trail Length** | Number of trail dots left behind each circle. |
 | **Max Circles per Column** | Cap on simultaneous drops in one column. |
 | **Gap Between Circles** | Pixel gap between columns (keeps adjacent circles from touching). |
-| **Mouse Effect** | Choose from six interaction modes (see below). |
 | **Mouse Effect Radius** | How far the mouse influence extends. |
 
-### Mouse Interaction Effects
-Move the mouse over the canvas to trigger the selected effect:
+#### Image Trail
+
+| Setting | What it controls |
+|---|---|
+| **White Circles Only** | Disables the background image coloring, rendering plain white circles instead. |
+| **Trail Dim** | Trail circles fade in opacity in addition to shrinking. |
+| **Trail Brightness** | Adjusts the brightness of image-colored trail circles (0 = dark, 1 = normal, 2 = bright). |
+
+#### Head Circle Tuning
+
+| Setting | What it controls |
+|---|---|
+| **Continuous Head** | The head circle falls smoothly while leaving a quantized trail behind it. |
+| **Head Smoothing** | Controls interpolation between grid rows (0 = snap to grid, 1 = fully smooth glide). |
+| **Head Scale Min** | Minimum scale when the head circle first appears at a new row. |
+| **Head Fade Min** | Minimum opacity when the head circle first appears at a new row. |
+
+### Mouse Interaction
+Move the mouse over the canvas to interact with the circles:
 
 | Effect | Behaviour |
 |---|---|
 | **Glow** | Circles near the cursor glow brighter with a soft aura. |
-| **Repel** | Circles push away from the cursor. |
-| **Attract** | Circles pull toward the cursor. |
-| **Color Wave** | Circles near the cursor shift from white to a cyan-blue hue. |
-| **Freeze** | Circles near the cursor slow down and nearly stop. |
-| **Burst** | Extra circles spawn in columns near the cursor. |
+| **Growth** | Circles smoothly grow larger near the cursor and shrink back when it moves away. |
 
 ---
 
