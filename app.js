@@ -504,8 +504,52 @@
     }
 
     // Pass 1: Draw trail circles (these get image-colored)
+    // Collect all trail circles and deduplicate by position so that
+    // overlapping residual circles at the same grid slot are drawn only once,
+    // with the largest circle winning.
+    const trailMap = new Map();
     for (const d of drops) {
-      d.drawTrail(ctx);
+      const yOff = columnYOffset(d.col);
+      const r = settings.circleRadius;
+      const effect = settings.mouseEffect;
+      const trailLen = d.trail.length;
+
+      for (let i = 0; i < trailLen; i++) {
+        const ty = d.trail[i] + yOff;
+        const t = (i + 1) / (trailLen + 1);
+        const tCurve = t * t;
+        const circleR = r * (0.1 + 0.9 * tCurve);
+        const alpha = settings.trailDim ? (0.05 + 0.6 * tCurve) : 0.65;
+
+        const mi = d._mouseInfluence(d.x, ty);
+        const finalAlpha = alpha * (mi.freeze < 1 ? Math.max(mi.freeze, 0.3) : 1) + mi.extra;
+
+        const drawX = d.x + mi.dx;
+        const drawY = ty + mi.dy;
+
+        const key = d.col + "," + d.trail[i];
+        const existing = trailMap.get(key);
+        if (!existing || circleR > existing.circleR) {
+          trailMap.set(key, { drawX, drawY, circleR, finalAlpha, hue: mi.hue, influence: mi.influence, effect });
+        }
+      }
+    }
+    for (const tc of trailMap.values()) {
+      ctx.beginPath();
+      ctx.arc(tc.drawX, tc.drawY, Math.max(tc.circleR, 1), 0, Math.PI * 2);
+      if (tc.hue >= 0) {
+        ctx.fillStyle = "hsla(" + tc.hue + ", 80%, 70%, " + tc.finalAlpha + ")";
+      } else {
+        ctx.fillStyle = "rgba(255,255,255," + tc.finalAlpha + ")";
+      }
+      ctx.fill();
+
+      if (tc.effect === "glow" && tc.influence > 0) {
+        ctx.beginPath();
+        ctx.arc(tc.drawX, tc.drawY, tc.circleR * 1.6, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255," + (tc.influence * 0.08) + ")";
+        ctx.fill();
+      }
     }
 
     // Composite background image through trail circles so each trail circle
