@@ -6,6 +6,14 @@ A mesmerizing, interactive canvas animation of circles cascading down tightly-pa
 
 ---
 
+## Inspiration
+
+This project was inspired by a large piece of art hanging in the entry of [Perlo Construction](https://www.perlo.com/) near Portland, Oregon.
+
+![Inspiration art at Perlo Construction](https://github.com/user-attachments/assets/f4474b0a-d741-41f7-81a3-ecf2b070a8bb)
+
+---
+
 ## Features
 
 ### Core Animation
