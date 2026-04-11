@@ -330,7 +330,16 @@
   let bgImage = null;       // offscreen canvas with cover-fitted image
   let _bgRawImg = null;
 
-  function fitImageToScreen(img) {
+  // ── Image crossfade transition state ─────────────────────────
+  let nextBgImage = null;      // offscreen canvas for the incoming image
+  let _nextBgRawImg = null;
+  let transitionAlpha = 0;     // 0 = showing old image, 1 = fully transitioned
+  let transitioning = false;
+  const TRANSITION_DURATION = 2000; // ms for the fade-in
+  let transitionStart = 0;
+
+  /** Fit image to a new offscreen canvas (cover mode) and return it. */
+  function fitImageToCanvas(img) {
     const sw = W();
     const sh = H();
     const offscreen = document.createElement("canvas");
@@ -338,25 +347,26 @@
     offscreen.height = sh;
     const octx = offscreen.getContext("2d");
 
-    // Cover: scale image to fill screen, crop excess equally
     const imgAspect = img.naturalWidth / img.naturalHeight;
     const scrAspect = sw / sh;
     let drawW, drawH, drawX, drawY;
     if (imgAspect > scrAspect) {
-      // Image is wider → fit height, crop sides
       drawH = sh;
       drawW = sh * imgAspect;
       drawX = (sw - drawW) / 2;
       drawY = 0;
     } else {
-      // Image is taller → fit width, crop top/bottom
       drawW = sw;
       drawH = sw / imgAspect;
       drawX = 0;
       drawY = (sh - drawH) / 2;
     }
     octx.drawImage(img, drawX, drawY, drawW, drawH);
-    bgImage = offscreen;
+    return offscreen;
+  }
+
+  function fitImageToScreen(img) {
+    bgImage = fitImageToCanvas(img);
   }
 
   function loadBackgroundImage() {
@@ -368,8 +378,18 @@
         if (!url) return;
         const img = new Image();
         img.onload = () => {
-          _bgRawImg = img;
-          fitImageToScreen(img);
+          if (!bgImage) {
+            // First load – show immediately
+            _bgRawImg = img;
+            fitImageToScreen(img);
+          } else {
+            // Subsequent loads – crossfade into the new image
+            _nextBgRawImg = img;
+            nextBgImage = fitImageToCanvas(img);
+            transitioning = true;
+            transitionStart = performance.now();
+            transitionAlpha = 0;
+          }
         };
         img.src = url;
       })
@@ -378,8 +398,12 @@
 
   window.addEventListener("resize", () => {
     if (_bgRawImg) fitImageToScreen(_bgRawImg);
+    if (_nextBgRawImg) nextBgImage = fitImageToCanvas(_nextBgRawImg);
   });
   loadBackgroundImage();
+
+  // ── Rotate image every 30 seconds ────────────────────────────
+  setInterval(loadBackgroundImage, 30000);
 
   // ── State ─────────────────────────────────────────────────────
   let drops = [];
@@ -510,23 +534,50 @@
 
     // Composite background image through trail circles so each trail circle
     // shows the image color at its position (avoids getImageData / CORS).
-    if (bgImage && !settings.whiteCirclesOnly) {
-      ctx.globalCompositeOperation = "source-atop";
-      ctx.drawImage(bgImage, 0, 0, W(), H());
-
-      // Adjust brightness of image-colored trail circles
-      const brightness = settings.trailBrightness;
-      if (brightness < 1) {
-        const darkenAmount = 1 - brightness;
-        ctx.fillStyle = `rgba(0,0,0,${darkenAmount})`;
-        ctx.fillRect(0, 0, W(), H());
-      } else if (brightness > 1) {
-        const brightenAmount = Math.min(brightness - 1, 1);
-        ctx.fillStyle = `rgba(255,255,255,${brightenAmount})`;
-        ctx.fillRect(0, 0, W(), H());
+    if (!settings.whiteCirclesOnly) {
+      // Advance crossfade transition
+      if (transitioning && nextBgImage) {
+        const elapsed = performance.now() - transitionStart;
+        transitionAlpha = Math.min(elapsed / TRANSITION_DURATION, 1);
+        if (transitionAlpha >= 1) {
+          // Transition complete – promote next image to current
+          bgImage = nextBgImage;
+          _bgRawImg = _nextBgRawImg;
+          nextBgImage = null;
+          _nextBgRawImg = null;
+          transitioning = false;
+          transitionAlpha = 0;
+        }
       }
 
-      ctx.globalCompositeOperation = "source-over";
+      if (bgImage) {
+        ctx.globalCompositeOperation = "source-atop";
+
+        if (transitioning && nextBgImage) {
+          // Blend old and new images during crossfade
+          ctx.globalAlpha = 1 - transitionAlpha;
+          ctx.drawImage(bgImage, 0, 0, W(), H());
+          ctx.globalAlpha = transitionAlpha;
+          ctx.drawImage(nextBgImage, 0, 0, W(), H());
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.drawImage(bgImage, 0, 0, W(), H());
+        }
+
+        // Adjust brightness of image-colored trail circles
+        const brightness = settings.trailBrightness;
+        if (brightness < 1) {
+          const darkenAmount = 1 - brightness;
+          ctx.fillStyle = `rgba(0,0,0,${darkenAmount})`;
+          ctx.fillRect(0, 0, W(), H());
+        } else if (brightness > 1) {
+          const brightenAmount = Math.min(brightness - 1, 1);
+          ctx.fillStyle = `rgba(255,255,255,${brightenAmount})`;
+          ctx.fillRect(0, 0, W(), H());
+        }
+
+        ctx.globalCompositeOperation = "source-over";
+      }
     }
 
     // Pass 2: Draw head circles on top (these stay white)
