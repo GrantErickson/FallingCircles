@@ -28,7 +28,6 @@
     trailLength: 24,
     maxPerColumn: 8,
     gap: 1,              // px gap between adjacent circles
-    mouseEffect: "glow",
     mouseRadius: 120,
     continuousHead: true, // head falls continuously without smoothing
     headSmoothing: 0.8,  // 0 = snap to grid row, 1 = fully interpolated glide
@@ -54,10 +53,6 @@
       settings[id] = parseFloat(el.value);
       valEl.textContent = el.value;
     });
-  });
-
-  document.querySelectorAll('input[name="mouseEffect"]').forEach(r => {
-    r.addEventListener("change", () => { settings.mouseEffect = r.value; });
   });
 
   // Trail dim checkbox
@@ -207,68 +202,39 @@
       }
     }
 
-    /* Helper: apply mouse effect and return draw adjustments */
+    /* Helper: compute mouse proximity influence for glow + growth */
     _mouseInfluence(px, py) {
       const mr = settings.mouseRadius;
-      const effect = settings.mouseEffect;
       const dist = Math.hypot(px - mouse.x, py - mouse.y);
       const influence = dist < mr ? 1 - dist / mr : 0;
-      let dx = 0, dy = 0, extra = 0, hue = -1, freeze = 1;
-
-      if (influence > 0) {
-        if (effect === "repel") {
-          const angle = Math.atan2(py - mouse.y, px - mouse.x);
-          dx = Math.cos(angle) * influence * 12;
-          dy = Math.sin(angle) * influence * 12;
-        } else if (effect === "attract") {
-          const angle = Math.atan2(mouse.y - py, mouse.x - px);
-          dx = Math.cos(angle) * influence * 8;
-          dy = Math.sin(angle) * influence * 8;
-        } else if (effect === "glow") {
-          extra = influence * 0.5;
-        } else if (effect === "color") {
-          hue = influence * 220 + 180;
-        } else if (effect === "freeze") {
-          freeze = 1 - influence * 0.95;
-        }
-      }
-      return { dx, dy, extra, hue, freeze, influence };
+      const extra = influence > 0 ? influence * 0.5 : 0;
+      return { extra, influence };
     }
 
     drawTrail(ctx) {
       const yOff = columnYOffset(this.col);
       const r = settings.circleRadius;
-      const effect = settings.mouseEffect;
       const trailLen = this.trail.length;
 
       // Draw trail circles (oldest first, smallest first)
       for (let i = 0; i < trailLen; i++) {
         const ty = this.trail[i] + yOff;
-        // i=0 is oldest/top, i=trailLen-1 is newest (just behind head)
-        // Scale: use a power curve so more circles are small/faded at the tail
-        const t = (i + 1) / (trailLen + 1); // 0→1 approaching head
-        const tCurve = t * t; // power curve: more circles stay small/faint
+        const t = (i + 1) / (trailLen + 1);
+        const tCurve = t * t;
         const circleR = r * (0.1 + 0.9 * tCurve);
         const alpha = settings.trailDim ? (0.05 + 0.6 * tCurve) : 0.65;
 
         const mi = this._mouseInfluence(this.x, ty);
-        const finalAlpha = alpha * (mi.freeze < 1 ? Math.max(mi.freeze, 0.3) : 1) + mi.extra;
-
-        const drawX = this.x + mi.dx;
-        const drawY = ty + mi.dy;
+        const finalAlpha = alpha + mi.extra;
 
         ctx.beginPath();
-        ctx.arc(drawX, drawY, Math.max(circleR, 1), 0, Math.PI * 2);
-        if (mi.hue >= 0) {
-          ctx.fillStyle = `hsla(${mi.hue}, 80%, 70%, ${finalAlpha})`;
-        } else {
-          ctx.fillStyle = `rgba(255,255,255,${finalAlpha})`;
-        }
+        ctx.arc(this.x, ty, Math.max(circleR, 1), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${finalAlpha})`;
         ctx.fill();
 
-        if (effect === "glow" && mi.influence > 0) {
+        if (mi.influence > 0) {
           ctx.beginPath();
-          ctx.arc(drawX, drawY, circleR * 1.6, 0, Math.PI * 2);
+          ctx.arc(this.x, ty, circleR * 1.6, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.08})`;
           ctx.fill();
         }
@@ -278,7 +244,6 @@
     drawHead(ctx) {
       const yOff = columnYOffset(this.col);
       const r = settings.circleRadius;
-      const effect = settings.mouseEffect;
 
       // Draw leading (head) circle
       let headY;
@@ -286,22 +251,17 @@
       let headFade;
 
       if (settings.continuousHead) {
-        // Continuous mode: draw at exact pixel position, full size, no smoothing
         headY = this.continuousY + yOff;
         headScale = 1;
         headFade = 1;
       } else {
-        // Original quantized mode with smoothing/scaling
-        // tickProgress goes from 0 (just moved) to 1 (about to move again)
         const tickProgress = Math.min(this.tickCounter / Math.max(this.tickInterval - 1, 1), 1);
-        // Fast ease-out curve: reaches ~90% size within first 30% of interval
         const ease = 1 - Math.pow(1 - tickProgress, 3);
         const scaleMin = settings.headScaleMin;
         const fadeMin = settings.headFadeMin;
         headScale = scaleMin + (1 - scaleMin) * ease;
         headFade = fadeMin + (1 - fadeMin) * ease;
 
-        // Smooth position interpolation between previous and current grid row
         const smoothing = settings.headSmoothing;
         const prevRowY = (this.row - 1) * rowStep();
         const currRowY = this.row * rowStep();
@@ -313,13 +273,13 @@
       const headAlpha = headFade * (0.95 + mi.extra);
 
       ctx.beginPath();
-      ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale, 0, Math.PI * 2);
+      ctx.arc(this.x, headY, r * headScale, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(255,255,255,${headAlpha})`;
       ctx.fill();
 
-      if (effect === "glow" && mi.influence > 0) {
+      if (mi.influence > 0) {
         ctx.beginPath();
-        ctx.arc(this.x + mi.dx, headY + mi.dy, r * headScale * 2.2, 0, Math.PI * 2);
+        ctx.arc(this.x, headY, r * headScale * 2.2, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.12})`;
         ctx.fill();
       }
@@ -407,7 +367,7 @@
 
   // ── State ─────────────────────────────────────────────────────
   let drops = [];
-  // Per-column spawn cooldowns to prevent synchronised bursts
+  // Per-column spawn cooldowns to prevent synchronised spawns
   let columnCooldowns = [];
 
   // Alternating column parity for hex-grid spawning in continuous mode
@@ -441,8 +401,11 @@
   }
   initCooldowns();
 
-  // ── Burst effect bookkeeping ──────────────────────────────────
-  let burstCooldown = 0;
+  // ── Residual circle growth state (for smooth grow/shrink near mouse) ───
+  const residualGrowth = new Map(); // key: "col,trailY" → current growth factor (0..1)
+  const GROWTH_SPEED = 0.08;  // how fast circles grow toward target
+  const SHRINK_SPEED = 0.04;  // how fast circles shrink back
+  const MAX_GROWTH = 1.8;     // maximum scale multiplier when mouse is directly on circle
 
   // ── Main loop ─────────────────────────────────────────────────
   function frame() {
@@ -483,37 +446,9 @@
       }
     }
 
-    // Burst effect: spawn extra near mouse
-    if (settings.mouseEffect === "burst" && mouse.x > 0) {
-      burstCooldown--;
-      if (burstCooldown <= 0) {
-        burstCooldown = 4; // every 4 frames
-        const cw = columnWidth();
-        for (let c = 0; c < cols; c++) {
-          const cx = columnX(c);
-          if (Math.abs(cx - mouse.x) < settings.mouseRadius * 0.5) {
-            if (dropsInColumn(c) < settings.maxPerColumn + 2 && canSpawnInColumn(c) && Math.random() < 0.35) {
-              drops.push(new Drop(c));
-            }
-          }
-        }
-      }
-    }
-
     // Update all drops
     for (const d of drops) {
-      // If freeze effect, temporarily slow the tick counter
-      if (settings.mouseEffect === "freeze") {
-        const yOff = columnYOffset(d.col);
-        const dist = Math.hypot(d.x - mouse.x, (d.y + yOff) - mouse.y);
-        const mr = settings.mouseRadius;
-        const influence = dist < mr ? 1 - dist / mr : 0;
-        if (!(influence > 0.5 && Math.random() < influence * 0.9)) {
-          d.update();
-        }
-      } else {
-        d.update();
-      }
+      d.update();
     }
 
     // Pass 1: Draw trail circles (these get image-colored)
@@ -521,10 +456,10 @@
     // overlapping residual circles at the same grid slot are drawn only once,
     // with the largest circle winning.
     const trailMap = new Map();
+    const activeKeys = new Set();
     for (const d of drops) {
       const yOff = columnYOffset(d.col);
       const r = settings.circleRadius;
-      const effect = settings.mouseEffect;
       const trailLen = d.trail.length;
 
       for (let i = 0; i < trailLen; i++) {
@@ -535,32 +470,55 @@
         const alpha = settings.trailDim ? (0.05 + 0.6 * tCurve) : 0.65;
 
         const mi = d._mouseInfluence(d.x, ty);
-        const finalAlpha = alpha * (mi.freeze < 1 ? Math.max(mi.freeze, 0.3) : 1) + mi.extra;
+        const finalAlpha = alpha + mi.extra;
 
-        const drawX = d.x + mi.dx;
-        const drawY = ty + mi.dy;
+        const drawX = d.x;
+        const drawY = ty;
 
         const key = d.col + "," + d.trail[i];
+        activeKeys.add(key);
         const existing = trailMap.get(key);
         if (!existing || circleR > existing.circleR) {
-          trailMap.set(key, { drawX, drawY, circleR, finalAlpha, hue: mi.hue, influence: mi.influence, effect });
+          trailMap.set(key, { drawX, drawY, circleR, finalAlpha, influence: mi.influence, key });
         }
       }
     }
+
+    // Clean up growth entries for circles that no longer exist
+    for (const key of residualGrowth.keys()) {
+      if (!activeKeys.has(key)) residualGrowth.delete(key);
+    }
+
+    // Draw trail circles with smooth grow/shrink near mouse
     for (const tc of trailMap.values()) {
-      ctx.beginPath();
-      ctx.arc(tc.drawX, tc.drawY, Math.max(tc.circleR, 1), 0, Math.PI * 2);
-      if (tc.hue >= 0) {
-        ctx.fillStyle = "hsla(" + tc.hue + ", 80%, 70%, " + tc.finalAlpha + ")";
+      // Compute target growth based on mouse proximity
+      const targetGrowth = tc.influence;
+      // Smoothly interpolate current growth toward target
+      const currentGrowth = residualGrowth.get(tc.key) || 0;
+      let newGrowth;
+      if (targetGrowth > currentGrowth) {
+        newGrowth = currentGrowth + (targetGrowth - currentGrowth) * GROWTH_SPEED;
       } else {
-        ctx.fillStyle = "rgba(255,255,255," + tc.finalAlpha + ")";
+        newGrowth = currentGrowth + (targetGrowth - currentGrowth) * SHRINK_SPEED;
       }
+      // Snap to zero if very small to avoid lingering micro-growth
+      if (newGrowth < 0.001) newGrowth = 0;
+      residualGrowth.set(tc.key, newGrowth);
+
+      // Apply growth: scale the radius up
+      const growScale = 1 + newGrowth * (MAX_GROWTH - 1);
+      const grownR = tc.circleR * growScale;
+
+      ctx.beginPath();
+      ctx.arc(tc.drawX, tc.drawY, Math.max(grownR, 1), 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255," + tc.finalAlpha + ")";
       ctx.fill();
 
-      if (tc.effect === "glow" && tc.influence > 0) {
+      // Glow ring for circles near mouse
+      if (newGrowth > 0.01) {
         ctx.beginPath();
-        ctx.arc(tc.drawX, tc.drawY, tc.circleR * 1.6, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255," + (tc.influence * 0.08) + ")";
+        ctx.arc(tc.drawX, tc.drawY, grownR * 1.4, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255," + (newGrowth * 0.1) + ")";
         ctx.fill();
       }
     }

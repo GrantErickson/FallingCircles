@@ -104,20 +104,3 @@ canvas {
   accent-color: #888;
 }
 
-.radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-bottom: 10px;
-}
-
-.radio-group label {
-  font-size: 12px;
-  cursor: pointer;
-  margin-bottom: 2px;
-}
-
-.radio-group input[type="radio"] {
-  accent-color: #888;
-  margin-right: 4px;
-}
