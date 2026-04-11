@@ -2,7 +2,7 @@
 
 A mesmerizing, interactive canvas animation of circles cascading down tightly-packed columns. Built with vanilla HTML, CSS, and JavaScript — no frameworks or build steps required.
 
-## 🚀 [Try it live on GitHub Pages!](https://granterickson.github.io/FallingCircles/)
+## 🚀 <a href="https://granterickson.github.io/FallingCircles/" target="_blank">Try it live on GitHub Pages!</a>
 
 ---
 
