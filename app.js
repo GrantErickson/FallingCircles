@@ -36,6 +36,7 @@
     headFadeMin: 0.4,    // minimum opacity when head first appears at new row
     trailBrightness: 1,  // brightness of image-colored trail circles (0=dark, 1=normal, 2=bright)
     trailDim: false,     // whether trail circles fade (dim) in addition to shrinking
+    whiteCirclesOnly: false, // disable picture, use plain white circles
   };
 
   // Wire up UI controls
@@ -64,6 +65,14 @@
   if (trailDimEl) {
     trailDimEl.addEventListener("change", () => {
       settings.trailDim = trailDimEl.checked;
+    });
+  }
+
+  // White circles only checkbox
+  const whiteCirclesOnlyEl = document.getElementById("whiteCirclesOnly");
+  if (whiteCirclesOnlyEl) {
+    whiteCirclesOnlyEl.addEventListener("change", () => {
+      settings.whiteCirclesOnly = whiteCirclesOnlyEl.checked;
     });
   }
 
@@ -501,7 +510,7 @@
 
     // Composite background image through trail circles so each trail circle
     // shows the image color at its position (avoids getImageData / CORS).
-    if (bgImage) {
+    if (bgImage && !settings.whiteCirclesOnly) {
       ctx.globalCompositeOperation = "source-atop";
       ctx.drawImage(bgImage, 0, 0, W(), H());
 
