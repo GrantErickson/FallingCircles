@@ -338,7 +338,8 @@
   const TRANSITION_DURATION = 2000; // ms for the fade-in
   let transitionStart = 0;
 
-  function fitImageToScreen(img) {
+  /** Fit image to a new offscreen canvas (cover mode) and return it. */
+  function fitImageToCanvas(img) {
     const sw = W();
     const sh = H();
     const offscreen = document.createElement("canvas");
@@ -346,25 +347,26 @@
     offscreen.height = sh;
     const octx = offscreen.getContext("2d");
 
-    // Cover: scale image to fill screen, crop excess equally
     const imgAspect = img.naturalWidth / img.naturalHeight;
     const scrAspect = sw / sh;
     let drawW, drawH, drawX, drawY;
     if (imgAspect > scrAspect) {
-      // Image is wider → fit height, crop sides
       drawH = sh;
       drawW = sh * imgAspect;
       drawX = (sw - drawW) / 2;
       drawY = 0;
     } else {
-      // Image is taller → fit width, crop top/bottom
       drawW = sw;
       drawH = sw / imgAspect;
       drawX = 0;
       drawY = (sh - drawH) / 2;
     }
     octx.drawImage(img, drawX, drawY, drawW, drawH);
-    bgImage = offscreen;
+    return offscreen;
+  }
+
+  function fitImageToScreen(img) {
+    bgImage = fitImageToCanvas(img);
   }
 
   function loadBackgroundImage() {
@@ -392,33 +394,6 @@
         img.src = url;
       })
       .catch(() => { /* silently fall back to white circles */ });
-  }
-
-  /** Fit image to a new offscreen canvas and return it (does NOT assign bgImage). */
-  function fitImageToCanvas(img) {
-    const sw = W();
-    const sh = H();
-    const offscreen = document.createElement("canvas");
-    offscreen.width = sw;
-    offscreen.height = sh;
-    const octx = offscreen.getContext("2d");
-
-    const imgAspect = img.naturalWidth / img.naturalHeight;
-    const scrAspect = sw / sh;
-    let drawW, drawH, drawX, drawY;
-    if (imgAspect > scrAspect) {
-      drawH = sh;
-      drawW = sh * imgAspect;
-      drawX = (sw - drawW) / 2;
-      drawY = 0;
-    } else {
-      drawW = sw;
-      drawH = sw / imgAspect;
-      drawX = 0;
-      drawY = (sh - drawH) / 2;
-    }
-    octx.drawImage(img, drawX, drawY, drawW, drawH);
-    return offscreen;
   }
 
   window.addEventListener("resize", () => {
