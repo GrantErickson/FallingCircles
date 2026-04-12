@@ -105,9 +105,9 @@
     return offsetX + index * cw;
   }
 
-  // Offset every other column by half a diameter so adjacent circles interlock
+  // Offset every other column by half a row step so adjacent circles interlock
   function columnYOffset(index) {
-    return (index % 2 === 0) ? 0 : settings.circleRadius;
+    return (index % 2 === 0) ? 0 : rowStep() / 2;
   }
 
   // ── Vertical grid step (distance between row centres) ────────
@@ -142,6 +142,7 @@
         this.row = startRow;
         this.y = startRow * rowStep();
         this.continuousY = this.y;   // pixel-level y for continuous mode
+        this.spawnGridBase = 0;      // pre-seeded drops use absolute positioning
         // Build a trail of preceding rows (only non-negative rows)
         const trailLen = Math.min(
           settings.trailLength,
@@ -152,8 +153,12 @@
           this.trail.push(r * rowStep());
         }
       } else {
+        // Snap spawn to the nearest grid boundary of globalFallDistance
+        // so this drop is phase-locked with every other drop.
+        const step = rowStep();
+        this.spawnGridBase = Math.floor(globalFallDistance / step) * step;
         this.row = -1;                // current grid row (0 = top visible row)
-        this.y = -rowStep();          // pixel y of the leading circle
+        this.y = -step;               // pixel y of the leading circle
         this.continuousY = this.y;    // pixel-level y for continuous mode
         this.trail = [];              // array of grid-row y positions visited
       }
@@ -161,18 +166,17 @@
 
     update() {
       if (settings.continuousHead) {
-        // Continuous mode: head moves every frame by a pixel speed
-        const speed = settings.fallSpeed * 1.2;
-        this.continuousY += speed;
-
-        // Check if we crossed into a new grid row
+        // Compute continuousY from globalFallDistance, grid-snapped to this
+        // drop's spawn base.  All drops share the same sub-row phase so they
+        // stay perfectly aligned on the hex grid.
         const step = rowStep();
-        const nextRowY = (this.row + 1) * step;
-        if (this.continuousY >= nextRowY) {
+        this.continuousY = (globalFallDistance - this.spawnGridBase) - step;
+        const newRow = Math.floor(this.continuousY / step);
+
+        // Advance row(s) and leave grid-snapped trail entries
+        while (this.row < newRow) {
           this.row++;
           this.y = this.row * step;
-
-          // Leave a quantized trail circle at this grid position
           this.trail.push(this.y);
           if (this.trail.length > settings.trailLength) this.trail.shift();
         }
@@ -370,9 +374,10 @@
   // Per-column spawn cooldowns to prevent synchronised spawns
   let columnCooldowns = [];
 
-  // Alternating column parity for hex-grid spawning in continuous mode
-  let spawnParity = 0; // 0 = even columns, 1 = odd columns
-  let spawnParityTimer = 0;
+  // Global fall distance for synchronized falling in continuous mode.
+  // All drops snap their spawn to the nearest grid boundary of this distance,
+  // ensuring their positions always differ by integer multiples of rowStep.
+  let globalFallDistance = 0;
 
   // Track how many active drops per column for spawn-limiting
   function dropsInColumn(ci) {
@@ -420,22 +425,13 @@
     // Ensure cooldown array matches column count (e.g. after resize)
     while (columnCooldowns.length < cols) columnCooldowns.push(randomCooldown());
 
-    // Spawn new drops with per-column cooldowns
-    // In continuous mode, alternate between even/odd columns for hex-grid spacing
-    const SPAWN_PARITY_INTERVAL = 60; // frames between parity switches
+    // Advance global fall distance for continuous mode grid synchronisation
     if (settings.continuousHead) {
-      spawnParityTimer += 1;
-      if (spawnParityTimer >= SPAWN_PARITY_INTERVAL) {
-        spawnParityTimer = 0;
-        spawnParity = 1 - spawnParity;
-      }
+      const speed = settings.fallSpeed * 1.2;
+      globalFallDistance += speed;
     }
 
     for (let c = 0; c < cols; c++) {
-      // In continuous mode, only spawn in columns matching current parity
-      if (settings.continuousHead && (c % 2) !== spawnParity) {
-        continue;
-      }
       if (columnCooldowns[c] > 0) {
         columnCooldowns[c]--;
         continue;
