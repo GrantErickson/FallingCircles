@@ -142,7 +142,7 @@
         this.row = startRow;
         this.y = startRow * rowStep();
         this.continuousY = this.y;   // pixel-level y for continuous mode
-        this.spawnGridBase = 0;      // pre-seeded drops use absolute positioning
+        this.spawnGridBase = 0;      // pre-seeded drops bypass grid-snap; row is absolute
         // Build a trail of preceding rows (only non-negative rows)
         const trailLen = Math.min(
           settings.trailLength,
@@ -170,6 +170,8 @@
         // drop's spawn base.  All drops share the same sub-row phase so they
         // stay perfectly aligned on the hex grid.
         const step = rowStep();
+        // Elapsed distance since this drop spawned, minus one rowStep so that
+        // the drop begins above the screen (row -1) and smoothly falls into view.
         this.continuousY = (globalFallDistance - this.spawnGridBase) - step;
         const newRow = Math.floor(this.continuousY / step);
 
