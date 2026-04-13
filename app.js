@@ -129,7 +129,9 @@
       this.col = colIndex;
       this.x = columnX(colIndex);
       this.alive = true;
-      // Per-drop random speed multiplier for speed variation setting
+      // Per-drop random speed multiplier for speed variation setting.
+      // Math.random() * 2 - 1 produces a value in [-1, 1]; multiplied by
+      // speedVariation and added to 1 this yields a range of [1-v, 1+v].
       this.speedMultiplier = 1 + (Math.random() * 2 - 1) * settings.speedVariation;
       // Accumulated offset from globalFallDistance for individual speed (continuous mode)
       this.speedOffset = 0;
