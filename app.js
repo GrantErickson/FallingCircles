@@ -630,19 +630,28 @@
       gctx.fillStyle = grad;
       gctx.fillRect(0, 0, gSize, gSize);
 
-      // Composite background image through the gradient mask
+      // Composite background image through the gradient mask.
+      // Only blit the visible sub-rectangle to avoid drawing the full image.
       gctx.globalCompositeOperation = "source-in";
       const gx = mouse.x - ghostR;
       const gy = mouse.y - ghostR;
+      const sx = Math.max(0, gx);
+      const sy = Math.max(0, gy);
+      const sw = Math.min(W(), gx + gSize) - sx;
+      const sh = Math.min(H(), gy + gSize) - sy;
+      const dx = sx - gx;
+      const dy = sy - gy;
 
-      if (transitioning && nextBgImage) {
-        gctx.globalAlpha = 1 - transitionAlpha;
-        gctx.drawImage(bgImage, -gx, -gy, W(), H());
-        gctx.globalAlpha = transitionAlpha;
-        gctx.drawImage(nextBgImage, -gx, -gy, W(), H());
-        gctx.globalAlpha = 1;
-      } else {
-        gctx.drawImage(bgImage, -gx, -gy, W(), H());
+      if (sw > 0 && sh > 0) {
+        if (transitioning && nextBgImage) {
+          gctx.globalAlpha = 1 - transitionAlpha;
+          gctx.drawImage(bgImage, sx, sy, sw, sh, dx, dy, sw, sh);
+          gctx.globalAlpha = transitionAlpha;
+          gctx.drawImage(nextBgImage, sx, sy, sw, sh, dx, dy, sw, sh);
+          gctx.globalAlpha = 1;
+        } else {
+          gctx.drawImage(bgImage, sx, sy, sw, sh, dx, dy, sw, sh);
+        }
       }
 
       gctx.globalCompositeOperation = "source-over";
