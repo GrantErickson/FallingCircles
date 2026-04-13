@@ -36,6 +36,7 @@
     trailBrightness: 1,  // brightness of image-colored trail circles (0=dark, 1=normal, 2=bright)
     trailDim: false,     // whether trail circles fade (dim) in addition to shrinking
     whiteCirclesOnly: false, // disable picture, use plain white circles
+    speedVariation: 0,       // random speed offset per drop (0 = uniform, 1 = ±100% variation)
   };
 
   // Wire up UI controls
@@ -43,7 +44,7 @@
     "circleRadius", "fallSpeed", "spawnRate",
     "trailLength", "maxPerColumn", "gap", "mouseRadius",
     "headSmoothing", "headScaleMin", "headFadeMin",
-    "trailBrightness"
+    "trailBrightness", "speedVariation"
   ];
   sliders.forEach(id => {
     const el = document.getElementById(id);
@@ -128,10 +129,17 @@
       this.col = colIndex;
       this.x = columnX(colIndex);
       this.alive = true;
+      // Per-drop random speed multiplier for speed variation setting.
+      // Math.random() * 2 - 1 produces a value in [-1, 1]; multiplied by
+      // speedVariation and added to 1 this yields a range of [1-v, 1+v].
+      this.speedMultiplier = 1 + (Math.random() * 2 - 1) * settings.speedVariation;
+      // Accumulated offset from globalFallDistance for individual speed (continuous mode)
+      this.speedOffset = 0;
       // frame counter for quantized movement
       this.tickCounter = 0;
-      // ticks between each grid step (derived from fallSpeed)
-      this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
+      // ticks between each grid step (derived from fallSpeed and speedMultiplier)
+      const effectiveSpeed = settings.fallSpeed * this.speedMultiplier;
+      this.tickInterval = Math.max(2, Math.round(12 / Math.max(effectiveSpeed, 0.1)));
       // slight variation for organic feel
       this.tickInterval += Math.floor(Math.random() * 3) - 1;
       // randomise starting tick so drops in different columns don't step in sync
@@ -172,7 +180,11 @@
         const step = rowStep();
         // Elapsed distance since this drop spawned, minus one rowStep so that
         // the drop begins above the screen (row -1) and smoothly falls into view.
-        this.continuousY = (globalFallDistance - this.spawnGridBase) - step;
+        // Accumulate per-drop speed offset for random speed variation
+        const speed = settings.fallSpeed * 1.2;
+        this.speedOffset += speed * (this.speedMultiplier - 1);
+
+        this.continuousY = (globalFallDistance + this.speedOffset - this.spawnGridBase) - step;
         const newRow = Math.floor(this.continuousY / step);
 
         // Advance row(s) and leave grid-snapped trail entries
@@ -196,7 +208,7 @@
           if (this.trail.length > settings.trailLength) this.trail.shift();
 
           // Recalculate tick interval in case fallSpeed changed
-          this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed, 0.1)));
+          this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed * this.speedMultiplier, 0.1)));
         }
       }
 
