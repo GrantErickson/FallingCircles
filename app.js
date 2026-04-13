@@ -26,26 +26,67 @@
     fallSpeed: 1.25,
     spawnRate: 0.025,    // probability per column per frame
     trailLength: 24,
-    maxPerColumn: 8,
+    maxPerColumn: 3,
     gap: 1,              // px gap between adjacent circles
     mouseRadius: 120,
-    continuousHead: true, // head falls continuously without smoothing
-    headSmoothing: 0.8,  // 0 = snap to grid row, 1 = fully interpolated glide
-    headScaleMin: 0.3,   // minimum scale when head first appears at new row
-    headFadeMin: 0.4,    // minimum opacity when head first appears at new row
     trailBrightness: 1,  // brightness of image-colored trail circles (0=dark, 1=normal, 2=bright)
     trailDim: false,     // whether trail circles fade (dim) in addition to shrinking
     whiteCirclesOnly: false, // disable picture, use plain white circles
-    speedVariation: 0,       // random speed offset per drop (0 = uniform, 1 = ±100% variation)
+    speedVariation: 0.25,    // random speed offset per drop (0 = uniform, 1 = ±100% variation)
   };
+
+  // Keep a copy of the defaults for the reset button
+  const defaultSettings = Object.assign({}, settings);
+
+  // ── LocalStorage persistence ──────────────────────────────────
+  const STORAGE_KEY = "fallingCirclesSettings";
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    } catch (_) { /* storage unavailable */ }
+  }
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      for (const key of Object.keys(settings)) {
+        if (key in saved && typeof saved[key] === typeof settings[key]) {
+          settings[key] = saved[key];
+        }
+      }
+    } catch (_) { /* ignore bad data */ }
+  }
+
+  loadSettings();
 
   // Wire up UI controls
   const sliders = [
     "circleRadius", "fallSpeed", "spawnRate",
     "trailLength", "maxPerColumn", "gap", "mouseRadius",
-    "headSmoothing", "headScaleMin", "headFadeMin",
     "trailBrightness", "speedVariation"
   ];
+
+  /** Sync all UI controls to reflect current settings values */
+  function syncUIFromSettings() {
+    sliders.forEach(id => {
+      const el = document.getElementById(id);
+      const valEl = document.getElementById(id + "Val");
+      if (!el) return;
+      el.value = settings[id];
+      valEl.textContent = settings[id];
+    });
+    // Checkboxes
+    const tdEl = document.getElementById("trailDim");
+    if (tdEl) tdEl.checked = settings.trailDim;
+    const wcEl = document.getElementById("whiteCirclesOnly");
+    if (wcEl) wcEl.checked = settings.whiteCirclesOnly;
+  }
+
+  syncUIFromSettings();
+
   sliders.forEach(id => {
     const el = document.getElementById(id);
     const valEl = document.getElementById(id + "Val");
@@ -53,6 +94,7 @@
     el.addEventListener("input", () => {
       settings[id] = parseFloat(el.value);
       valEl.textContent = el.value;
+      saveSettings();
     });
   });
 
@@ -61,6 +103,7 @@
   if (trailDimEl) {
     trailDimEl.addEventListener("change", () => {
       settings.trailDim = trailDimEl.checked;
+      saveSettings();
     });
   }
 
@@ -69,14 +112,17 @@
   if (whiteCirclesOnlyEl) {
     whiteCirclesOnlyEl.addEventListener("change", () => {
       settings.whiteCirclesOnly = whiteCirclesOnlyEl.checked;
+      saveSettings();
     });
   }
 
-  // Continuous head checkbox
-  const continuousHeadEl = document.getElementById("continuousHead");
-  if (continuousHeadEl) {
-    continuousHeadEl.addEventListener("change", () => {
-      settings.continuousHead = continuousHeadEl.checked;
+  // Reset button
+  const resetBtn = document.getElementById("resetSettings");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      Object.assign(settings, defaultSettings);
+      syncUIFromSettings();
+      saveSettings();
     });
   }
 
@@ -133,17 +179,8 @@
       // Math.random() * 2 - 1 produces a value in [-1, 1]; multiplied by
       // speedVariation and added to 1 this yields a range of [1-v, 1+v].
       this.speedMultiplier = 1 + (Math.random() * 2 - 1) * settings.speedVariation;
-      // Accumulated offset from globalFallDistance for individual speed (continuous mode)
+      // Accumulated offset from globalFallDistance for individual speed
       this.speedOffset = 0;
-      // frame counter for quantized movement
-      this.tickCounter = 0;
-      // ticks between each grid step (derived from fallSpeed and speedMultiplier)
-      const effectiveSpeed = settings.fallSpeed * this.speedMultiplier;
-      this.tickInterval = Math.max(2, Math.round(12 / Math.max(effectiveSpeed, 0.1)));
-      // slight variation for organic feel
-      this.tickInterval += Math.floor(Math.random() * 3) - 1;
-      // randomise starting tick so drops in different columns don't step in sync
-      this.tickCounter = Math.floor(Math.random() * this.tickInterval);
 
       if (startRow !== undefined && startRow !== null) {
         // Pre-seeded drop: place at a specific row with a partial trail
@@ -173,47 +210,25 @@
     }
 
     update() {
-      if (settings.continuousHead) {
-        // Compute continuousY from globalFallDistance, grid-snapped to this
-        // drop's spawn base.  All drops share the same sub-row phase so they
-        // stay perfectly aligned on the hex grid.
-        const step = rowStep();
-        // Elapsed distance since this drop spawned, minus one rowStep so that
-        // the drop begins above the screen (row -1) and smoothly falls into view.
-        // Accumulate per-drop speed offset for random speed variation
-        const speed = settings.fallSpeed * 1.2;
-        this.speedOffset += speed * (this.speedMultiplier - 1);
+      // Continuous head mode: compute continuousY from globalFallDistance,
+      // grid-snapped to this drop's spawn base.
+      const step = rowStep();
+      const speed = settings.fallSpeed * 1.2;
+      this.speedOffset += speed * (this.speedMultiplier - 1);
 
-        this.continuousY = (globalFallDistance + this.speedOffset - this.spawnGridBase) - step;
-        const newRow = Math.floor(this.continuousY / step);
+      this.continuousY = (globalFallDistance + this.speedOffset - this.spawnGridBase) - step;
+      const newRow = Math.floor(this.continuousY / step);
 
-        // Advance row(s) and leave grid-snapped trail entries
-        while (this.row < newRow) {
-          this.row++;
-          this.y = this.row * step;
-          this.trail.push(this.y);
-          if (this.trail.length > settings.trailLength) this.trail.shift();
-        }
-      } else {
-        // Original quantized mode
-        this.tickCounter++;
-        if (this.tickCounter >= this.tickInterval) {
-          this.tickCounter = 0;
-          // Advance one grid row
-          this.row++;
-          this.y = this.row * rowStep();
-
-          // Push current position into trail (trail stores y values)
-          this.trail.push(this.y);
-          if (this.trail.length > settings.trailLength) this.trail.shift();
-
-          // Recalculate tick interval in case fallSpeed changed
-          this.tickInterval = Math.max(2, Math.round(12 / Math.max(settings.fallSpeed * this.speedMultiplier, 0.1)));
-        }
+      // Advance row(s) and leave grid-snapped trail entries
+      while (this.row < newRow) {
+        this.row++;
+        this.y = this.row * step;
+        this.trail.push(this.y);
+        if (this.trail.length > settings.trailLength) this.trail.shift();
       }
 
       // Off screen? (leading circle plus trail all off-screen)
-      const headPos = settings.continuousHead ? this.continuousY : this.y;
+      const headPos = this.continuousY;
       const trailTop = this.trail.length > 0 ? this.trail[0] : headPos;
       if (trailTop > H() + rowStep() * 2) {
         this.alive = false;
@@ -263,29 +278,10 @@
       const yOff = columnYOffset(this.col);
       const r = settings.circleRadius;
 
-      // Draw leading (head) circle
-      let headY;
-      let headScale;
-      let headFade;
-
-      if (settings.continuousHead) {
-        headY = this.continuousY + yOff;
-        headScale = 1;
-        headFade = 1;
-      } else {
-        const tickProgress = Math.min(this.tickCounter / Math.max(this.tickInterval - 1, 1), 1);
-        const ease = 1 - Math.pow(1 - tickProgress, 3);
-        const scaleMin = settings.headScaleMin;
-        const fadeMin = settings.headFadeMin;
-        headScale = scaleMin + (1 - scaleMin) * ease;
-        headFade = fadeMin + (1 - fadeMin) * ease;
-
-        const smoothing = settings.headSmoothing;
-        const prevRowY = (this.row - 1) * rowStep();
-        const currRowY = this.row * rowStep();
-        const interpY = prevRowY + (currRowY - prevRowY) * (1 - smoothing + smoothing * ease);
-        headY = interpY + yOff;
-      }
+      // Draw leading (head) circle – always continuous mode
+      const headY = this.continuousY + yOff;
+      const headScale = 1;
+      const headFade = 1;
 
       const mi = this._mouseInfluence(this.x, headY);
       const headAlpha = headFade * (0.95 + mi.extra);
@@ -407,7 +403,7 @@
     const spawnY = -rowStep(); // new drops start at row -1
     for (const d of drops) {
       if (d.col !== ci) continue;
-      const headY = settings.continuousHead ? d.continuousY : d.y;
+      const headY = d.continuousY;
       if (Math.abs(headY - spawnY) < minSpacing) return false;
     }
     return true;
@@ -439,8 +435,8 @@
     // Ensure cooldown array matches column count (e.g. after resize)
     while (columnCooldowns.length < cols) columnCooldowns.push(randomCooldown());
 
-    // Advance global fall distance for continuous mode grid synchronisation
-    if (settings.continuousHead) {
+    // Advance global fall distance for grid synchronisation
+    {
       const speed = settings.fallSpeed * 1.2;
       globalFallDistance += speed;
     }
