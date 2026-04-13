@@ -416,6 +416,23 @@
   }
   initCooldowns();
 
+  // ── Ghost image overlay (cached offscreen canvas for mouse hover) ──────
+  let _ghostCanvas = null;
+  let _ghostCtx = null;
+  let _ghostSize = 0;
+
+  function getGhostCanvas(radius) {
+    const size = Math.ceil(radius * 2);
+    if (!_ghostCanvas || _ghostSize !== size) {
+      _ghostCanvas = document.createElement("canvas");
+      _ghostCanvas.width = size;
+      _ghostCanvas.height = size;
+      _ghostCtx = _ghostCanvas.getContext("2d");
+      _ghostSize = size;
+    }
+    return { canvas: _ghostCanvas, ctx: _ghostCtx, size };
+  }
+
   // ── Residual circle growth state (for smooth grow/shrink near mouse) ───
   const residualGrowth = new Map(); // key: "col,trailY" → current growth factor (0..1)
   const GROWTH_SPEED = 0.08;  // how fast circles grow toward target
@@ -594,6 +611,44 @@
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H());
       ctx.stroke();
+    }
+
+    // ── Ghost image reveal near mouse cursor ────────────────────
+    if (!settings.whiteCirclesOnly && bgImage && mouse.x > -9000) {
+      const ghostR = settings.mouseRadius;
+      const ghostAlpha = 0.18;
+      const { canvas: gc, ctx: gctx, size: gSize } = getGhostCanvas(ghostR);
+
+      gctx.clearRect(0, 0, gSize, gSize);
+
+      // Radial gradient mask: semi-transparent at centre, transparent at edge
+      const grad = gctx.createRadialGradient(ghostR, ghostR, 0, ghostR, ghostR, ghostR);
+      grad.addColorStop(0, "rgba(255,255,255," + ghostAlpha + ")");
+      grad.addColorStop(0.6, "rgba(255,255,255," + (ghostAlpha * 0.4) + ")");
+      grad.addColorStop(1, "rgba(255,255,255,0)");
+      gctx.globalCompositeOperation = "source-over";
+      gctx.fillStyle = grad;
+      gctx.fillRect(0, 0, gSize, gSize);
+
+      // Composite background image through the gradient mask
+      gctx.globalCompositeOperation = "source-in";
+      const gx = mouse.x - ghostR;
+      const gy = mouse.y - ghostR;
+
+      if (transitioning && nextBgImage) {
+        gctx.globalAlpha = 1 - transitionAlpha;
+        gctx.drawImage(bgImage, -gx, -gy, W(), H());
+        gctx.globalAlpha = transitionAlpha;
+        gctx.drawImage(nextBgImage, -gx, -gy, W(), H());
+        gctx.globalAlpha = 1;
+      } else {
+        gctx.drawImage(bgImage, -gx, -gy, W(), H());
+      }
+
+      gctx.globalCompositeOperation = "source-over";
+
+      // Stamp ghost onto main canvas
+      ctx.drawImage(gc, gx, gy);
     }
 
     requestAnimationFrame(frame);
