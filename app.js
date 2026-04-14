@@ -236,6 +236,14 @@
       }
     }
 
+    /* Fractional progress (0..1) toward the next grid row.
+       Used to smoothly interpolate trail circle sizes between discrete row steps. */
+    get rowFraction() {
+      const step = rowStep();
+      if (step <= 0) return 0;
+      return (this.continuousY / step) - this.row;
+    }
+
     /* Helper: compute mouse proximity influence for glow + growth */
     _mouseInfluence(px, py) {
       const mr = settings.mouseRadius;
@@ -249,11 +257,16 @@
       const yOff = columnYOffset(this.col);
       const r = settings.circleRadius;
       const trailLen = this.trail.length;
+      const frac = this.rowFraction;
+      const atMax = trailLen >= settings.trailLength;
 
       // Draw trail circles (oldest first, smallest first)
       for (let i = 0; i < trailLen; i++) {
         const ty = this.trail[i] + yOff;
-        const t = (i + 1) / (trailLen + 1);
+        // Smoothly interpolate size using fractional row progress
+        const t = atMax
+          ? (i + 1 - frac) / (trailLen + 1)
+          : (i + 1) / (trailLen + 1 + frac);
         const tCurve = t * t;
         const circleR = r * (0.1 + 0.9 * tCurve);
         const alpha = settings.trailDim ? (0.05 + 0.6 * tCurve) : 0.65;
@@ -485,10 +498,15 @@
       const yOff = columnYOffset(d.col);
       const r = settings.circleRadius;
       const trailLen = d.trail.length;
+      const frac = d.rowFraction;
+      const atMax = trailLen >= settings.trailLength;
 
       for (let i = 0; i < trailLen; i++) {
         const ty = d.trail[i] + yOff;
-        const t = (i + 1) / (trailLen + 1);
+        // Smoothly interpolate size using fractional row progress
+        const t = atMax
+          ? (i + 1 - frac) / (trailLen + 1)
+          : (i + 1) / (trailLen + 1 + frac);
         const tCurve = t * t;
         const circleR = r * (0.1 + 0.9 * tCurve);
         const alpha = settings.trailDim ? (0.05 + 0.6 * tCurve) : 0.65;
