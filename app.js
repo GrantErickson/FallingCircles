@@ -29,6 +29,7 @@
     maxPerColumn: 3,
     gap: 1,              // px gap between adjacent circles
     mouseRadius: 120,
+    mouseRevealBrightness: 0.18, // opacity of the ghost image revealed near the mouse (0=hidden, 1=fully visible)
     trailBrightness: 1,  // brightness of image-colored trail circles (0=dark, 1=normal, 2=bright)
     trailDim: false,     // whether trail circles fade (dim) in addition to shrinking
     whiteCirclesOnly: false, // disable picture, use plain white circles
@@ -66,7 +67,7 @@
   const sliders = [
     "circleRadius", "fallSpeed", "spawnRate",
     "trailLength", "maxPerColumn", "gap", "mouseRadius",
-    "trailBrightness", "speedVariation"
+    "mouseRevealBrightness", "trailBrightness", "speedVariation"
   ];
 
   /** Sync all UI controls to reflect current settings values */
@@ -616,7 +617,7 @@
     // ── Ghost image reveal near mouse cursor ────────────────────
     if (!settings.whiteCirclesOnly && bgImage && mouse.x > -9000) {
       const ghostR = settings.mouseRadius;
-      const ghostAlpha = 0.18;
+      const ghostAlpha = settings.mouseRevealBrightness;
       const { canvas: gc, ctx: gctx, size: gSize } = getGhostCanvas(ghostR);
 
       gctx.clearRect(0, 0, gSize, gSize);
