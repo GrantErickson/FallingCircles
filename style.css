@@ -32,6 +32,27 @@ canvas {
 }
 #settingsToggle:hover { background: rgba(255,255,255,0.25); }
 
+/* ── Open Image Button ───────────────────────────────── */
+#openImageBtn {
+  position: fixed;
+  bottom: 12px; right: 12px;
+  z-index: 100;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: #fff;
+  font-size: 20px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background .2s, opacity .25s;
+}
+#openImageBtn:hover { background: rgba(255,255,255,0.25); }
+#openImageBtn.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ── Settings Panel ──────────────────────────────────── */
 #settingsPanel {
   position: fixed;

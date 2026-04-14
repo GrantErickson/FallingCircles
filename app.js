@@ -106,6 +106,7 @@
     whiteCirclesOnlyEl.addEventListener("change", () => {
       settings.whiteCirclesOnly = whiteCirclesOnlyEl.checked;
       saveSettings();
+      updateOpenImageBtn();
     });
   }
 
@@ -115,12 +116,24 @@
       Object.assign(settings, defaultSettings);
       syncUIFromSettings();
       saveSettings();
+      updateOpenImageBtn();
     });
   }
 
   document.getElementById("settingsToggle").addEventListener("click", () => {
     document.getElementById("settingsPanel").classList.toggle("hidden");
   });
+
+  const openImageBtn = document.getElementById("openImageBtn");
+  openImageBtn.addEventListener("click", () => {
+    const url = bgRawImg ? bgRawImg.src : null;
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  });
+
+  function updateOpenImageBtn() {
+    const visible = !settings.whiteCirclesOnly && !!bgRawImg;
+    openImageBtn.classList.toggle("hidden", !visible);
+  }
 
   // ── Mouse tracking ────────────────────────────────────────────
   const mouse = { x: MOUSE_OFFSCREEN, y: MOUSE_OFFSCREEN };
@@ -276,6 +289,7 @@
           if (!bgImage) {
             bgRawImg = img;
             bgImage = fitImageToCanvas(img);
+            updateOpenImageBtn();
           } else {
             nextBgRawImg = img;
             nextBgImage = fitImageToCanvas(img);
@@ -452,6 +466,7 @@
           nextBgRawImg = null;
           transitioning = false;
           transitionAlpha = 0;
+          updateOpenImageBtn();
         }
       }
 
