@@ -24,7 +24,6 @@
   const settings = {
     circleRadius: 10,
     fallSpeed: 1.25,
-    spawnRate: 0.025,
     trailLength: 24,
     maxPerColumn: 3,
     gap: 1,
@@ -62,7 +61,7 @@
 
   // Wire up range sliders
   const sliders = [
-    "circleRadius", "fallSpeed", "spawnRate",
+    "circleRadius", "fallSpeed",
     "trailLength", "maxPerColumn", "gap", "mouseRadius",
     "mouseRevealBrightness", "trailBrightness", "speedVariation"
   ];
@@ -145,10 +144,13 @@
     return index % 2 ? rowStep() / 2 : 0;
   }
 
-  // ── Spawn cooldowns ────────────────────────────────────────────
-  const COOLDOWN_MIN = 30;
-  const COOLDOWN_MAX = 90;
-  const randomCooldown = () => COOLDOWN_MIN + Math.floor(Math.random() * (COOLDOWN_MAX - COOLDOWN_MIN));
+  // ── Deterministic spawn interval ─────────────────────────────
+  // Calculate the fall-distance interval at which to spawn a new drop
+  // so that exactly maxPerColumn drops are visible per column.
+  function spawnInterval() {
+    const visibleDistance = H() + (settings.trailLength + 1) * rowStep();
+    return visibleDistance / settings.maxPerColumn;
+  }
 
   // ── Drop ───────────────────────────────────────────────────────
   class Drop {
@@ -296,7 +298,10 @@
 
   // ── State ─────────────────────────────────────────────────────
   let drops = [];
-  let columnCooldowns = [];
+
+  // Per-column: globalFallDistance at which to next spawn a drop.
+  // Initialized with staggered offsets so columns don't all fire at once.
+  let columnNextSpawn = [];
 
   // All drops snap their spawn to the nearest grid boundary of this value,
   // keeping positions aligned to integer multiples of rowStep.
@@ -317,10 +322,14 @@
     return true;
   }
 
-  function initCooldowns() {
-    columnCooldowns = Array.from({ length: columnCount() }, randomCooldown);
+  function initColumnSpawns() {
+    const cols = columnCount();
+    const interval = spawnInterval();
+    columnNextSpawn = Array.from({ length: cols }, () =>
+      globalFallDistance + Math.random() * interval
+    );
   }
-  initCooldowns();
+  initColumnSpawns();
 
   // ── Ghost image overlay (offscreen canvas for mouse hover) ─────
   let ghostCanvas = null;
@@ -352,16 +361,20 @@
     ctx.clearRect(0, 0, W(), H());
 
     const cols = columnCount();
-    while (columnCooldowns.length < cols) columnCooldowns.push(randomCooldown());
+    while (columnNextSpawn.length < cols) {
+      columnNextSpawn.push(globalFallDistance + Math.random() * spawnInterval());
+    }
 
     globalFallDistance += settings.fallSpeed * SPEED_SCALE;
 
-    // Spawn new drops
+    // Spawn new drops at deterministic intervals
+    const interval = spawnInterval();
     for (let c = 0; c < cols; c++) {
-      if (columnCooldowns[c] > 0) { columnCooldowns[c]--; continue; }
-      if (dropsInColumn(c) < settings.maxPerColumn && canSpawnInColumn(c) && Math.random() < settings.spawnRate) {
+      if (globalFallDistance >= columnNextSpawn[c]
+          && dropsInColumn(c) < settings.maxPerColumn
+          && canSpawnInColumn(c)) {
         drops.push(new Drop(c));
-        columnCooldowns[c] = randomCooldown();
+        columnNextSpawn[c] = globalFallDistance + interval * (0.8 + Math.random() * 0.4);
       }
     }
 
