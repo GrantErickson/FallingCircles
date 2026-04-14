@@ -28,8 +28,8 @@
     trailLength: 24,
     maxPerColumn: 3,
     gap: 1,              // px gap between adjacent circles
-    mouseRadius: 120,
-    mouseRevealBrightness: 0.18, // opacity of the ghost image revealed near the mouse (0=hidden, 1=fully visible)
+    mouseRadius: 200,
+    mouseRevealBrightness: 0.5, // opacity of the ghost image revealed near the mouse (0=hidden, 1=fully visible)
     trailBrightness: 1,  // brightness of image-colored trail circles (0=dark, 1=normal, 2=bright)
     trailDim: false,     // whether trail circles fade (dim) in addition to shrinking
     whiteCirclesOnly: false, // disable picture, use plain white circles
