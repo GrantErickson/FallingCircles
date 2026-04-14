@@ -1,85 +1,80 @@
-/* ================================================================
-   Falling Circles – Main Application
-   ================================================================ */
-
 (() => {
   "use strict";
 
-  // ── Canvas setup ──────────────────────────────────────────────
+  // ── Canvas ────────────────────────────────────────────────────
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
 
   function resize() {
-    canvas.width = window.innerWidth * devicePixelRatio;
-    canvas.height = window.innerHeight * devicePixelRatio;
+    canvas.width = innerWidth * devicePixelRatio;
+    canvas.height = innerHeight * devicePixelRatio;
     ctx.scale(devicePixelRatio, devicePixelRatio);
   }
-  window.addEventListener("resize", resize);
+  addEventListener("resize", resize);
   resize();
 
-  const W = () => window.innerWidth;
-  const H = () => window.innerHeight;
+  const W = () => innerWidth;
+  const H = () => innerHeight;
+
+  // ── Constants ─────────────────────────────────────────────────
+  const SPEED_SCALE = 1.2;
+  const MOUSE_OFFSCREEN = -9999;
 
   // ── Settings ──────────────────────────────────────────────────
   const settings = {
     circleRadius: 10,
     fallSpeed: 1.25,
-    spawnRate: 0.025,    // probability per column per frame
+    spawnRate: 0.025,
     trailLength: 24,
     maxPerColumn: 3,
-    gap: 1,              // px gap between adjacent circles
+    gap: 1,
     mouseRadius: 200,
-    mouseRevealBrightness: 0.5, // opacity of the ghost image revealed near the mouse (0=hidden, 1=fully visible)
-    trailBrightness: 1,  // brightness of image-colored trail circles (0=dark, 1=normal, 2=bright)
-    trailDim: false,     // whether trail circles fade (dim) in addition to shrinking
-    whiteCirclesOnly: false, // disable picture, use plain white circles
-    speedVariation: 0.25,    // random speed offset per drop (0 = uniform, 1 = ±100% variation)
+    mouseRevealBrightness: 0.5,
+    trailBrightness: 1,
+    trailDim: false,
+    whiteCirclesOnly: false,
+    speedVariation: 0.25,
   };
 
-  // Keep a copy of the defaults for the reset button
-  const defaultSettings = Object.assign({}, settings);
+  const defaultSettings = { ...settings };
 
   // ── LocalStorage persistence ──────────────────────────────────
   const STORAGE_KEY = "fallingCirclesSettings";
 
   function saveSettings() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    } catch (_) { /* storage unavailable */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); }
+    catch { /* storage unavailable */ }
   }
 
   function loadSettings() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (!saved) return;
       for (const key of Object.keys(settings)) {
         if (key in saved && typeof saved[key] === typeof settings[key]) {
           settings[key] = saved[key];
         }
       }
-    } catch (_) { /* ignore bad data */ }
+    } catch { /* ignore bad data */ }
   }
 
   loadSettings();
 
-  // Wire up UI controls
+  // Wire up range sliders
   const sliders = [
     "circleRadius", "fallSpeed", "spawnRate",
     "trailLength", "maxPerColumn", "gap", "mouseRadius",
     "mouseRevealBrightness", "trailBrightness", "speedVariation"
   ];
 
-  /** Sync all UI controls to reflect current settings values */
   function syncUIFromSettings() {
-    sliders.forEach(id => {
+    for (const id of sliders) {
       const el = document.getElementById(id);
       const valEl = document.getElementById(id + "Val");
-      if (!el) return;
+      if (!el) continue;
       el.value = settings[id];
-      valEl.textContent = settings[id];
-    });
-    // Checkboxes
+      if (valEl) valEl.textContent = settings[id];
+    }
     const tdEl = document.getElementById("trailDim");
     if (tdEl) tdEl.checked = settings.trailDim;
     const wcEl = document.getElementById("whiteCirclesOnly");
@@ -88,18 +83,17 @@
 
   syncUIFromSettings();
 
-  sliders.forEach(id => {
+  for (const id of sliders) {
     const el = document.getElementById(id);
     const valEl = document.getElementById(id + "Val");
-    if (!el) return;
+    if (!el) continue;
     el.addEventListener("input", () => {
       settings[id] = parseFloat(el.value);
-      valEl.textContent = el.value;
+      if (valEl) valEl.textContent = el.value;
       saveSettings();
     });
-  });
+  }
 
-  // Trail dim checkbox
   const trailDimEl = document.getElementById("trailDim");
   if (trailDimEl) {
     trailDimEl.addEventListener("change", () => {
@@ -108,7 +102,6 @@
     });
   }
 
-  // White circles only checkbox
   const whiteCirclesOnlyEl = document.getElementById("whiteCirclesOnly");
   if (whiteCirclesOnlyEl) {
     whiteCirclesOnlyEl.addEventListener("change", () => {
@@ -117,7 +110,6 @@
     });
   }
 
-  // Reset button
   const resetBtn = document.getElementById("resetSettings");
   if (resetBtn) {
     resetBtn.addEventListener("click", () => {
@@ -127,100 +119,75 @@
     });
   }
 
-  // Settings panel toggle
   document.getElementById("settingsToggle").addEventListener("click", () => {
     document.getElementById("settingsPanel").classList.toggle("hidden");
   });
 
   // ── Mouse tracking ────────────────────────────────────────────
-  const mouse = { x: -9999, y: -9999 };
-  window.addEventListener("mousemove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-  window.addEventListener("mouseleave", () => { mouse.x = -9999; mouse.y = -9999; });
+  const mouse = { x: MOUSE_OFFSCREEN, y: MOUSE_OFFSCREEN };
+  addEventListener("mousemove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+  addEventListener("mouseleave", () => { mouse.x = MOUSE_OFFSCREEN; mouse.y = MOUSE_OFFSCREEN; });
 
-  // ── Column geometry helpers ───────────────────────────────────
-  function columnWidth() {
-    return settings.circleRadius * 2 + settings.gap;
-  }
-
-  function columnCount() {
-    return Math.floor(W() / columnWidth());
-  }
+  // ── Grid geometry ───────────────────────────────────────────
+  const columnWidth = () => settings.circleRadius * 2 + settings.gap;
+  const rowStep     = () => settings.circleRadius * 2 + settings.gap;
+  const columnCount = () => Math.floor(W() / columnWidth());
 
   function columnX(index) {
     const cw = columnWidth();
     const totalW = columnCount() * cw;
-    const offsetX = (W() - totalW) / 2 + cw / 2; // centre grid
-    return offsetX + index * cw;
+    const offset = (W() - totalW) / 2 + cw / 2;
+    return offset + index * cw;
   }
 
-  // Offset every other column by half a row step so adjacent circles interlock
+  // Offset odd columns by half a row step for hex-style interlocking
   function columnYOffset(index) {
-    return (index % 2 === 0) ? 0 : rowStep() / 2;
+    return index % 2 ? rowStep() / 2 : 0;
   }
 
-  // ── Vertical grid step (distance between row centres) ────────
-  function rowStep() {
-    return settings.circleRadius * 2 + settings.gap;
-  }
-
-  // ── Spawn cooldown range (frames) to stagger column spawns ────
+  // ── Spawn cooldowns ────────────────────────────────────────────
   const COOLDOWN_MIN = 30;
   const COOLDOWN_MAX = 90;
-  function randomCooldown() {
-    return COOLDOWN_MIN + Math.floor(Math.random() * (COOLDOWN_MAX - COOLDOWN_MIN));
-  }
+  const randomCooldown = () => COOLDOWN_MIN + Math.floor(Math.random() * (COOLDOWN_MAX - COOLDOWN_MIN));
 
-  // ── Circle (drop) class ───────────────────────────────────────
+  // ── Drop ───────────────────────────────────────────────────────
   class Drop {
     constructor(colIndex, startRow) {
       this.col = colIndex;
       this.x = columnX(colIndex);
       this.alive = true;
-      // Per-drop random speed multiplier for speed variation setting.
-      // Math.random() * 2 - 1 produces a value in [-1, 1]; multiplied by
-      // speedVariation and added to 1 this yields a range of [1-v, 1+v].
       this.speedMultiplier = 1 + (Math.random() * 2 - 1) * settings.speedVariation;
-      // Accumulated offset from globalFallDistance for individual speed
       this.speedOffset = 0;
 
-      if (startRow !== undefined && startRow !== null) {
-        // Pre-seeded drop: place at a specific row with a partial trail
+      if (startRow != null) {
+        // Pre-seeded: place at a specific row with a partial trail
         this.row = startRow;
         this.y = startRow * rowStep();
-        this.continuousY = this.y;   // pixel-level y for continuous mode
-        this.spawnGridBase = 0;      // pre-seeded drops bypass grid-snap; row is absolute
-        // Build a trail of preceding rows (only non-negative rows)
-        const trailLen = Math.min(
-          settings.trailLength,
-          Math.max(0, startRow)  // can't trail above row 0
-        );
+        this.continuousY = this.y;
+        this.spawnGridBase = 0;
+        const trailLen = Math.min(settings.trailLength, Math.max(0, startRow));
         this.trail = [];
         for (let r = startRow - trailLen; r < startRow; r++) {
           this.trail.push(r * rowStep());
         }
       } else {
-        // Snap spawn to the nearest grid boundary of globalFallDistance
-        // so this drop is phase-locked with every other drop.
+        // Snap spawn to the nearest grid boundary so drops stay phase-locked
         const step = rowStep();
         this.spawnGridBase = Math.floor(globalFallDistance / step) * step;
-        this.row = -1;                // current grid row (0 = top visible row)
-        this.y = -step;               // pixel y of the leading circle
-        this.continuousY = this.y;    // pixel-level y for continuous mode
-        this.trail = [];              // array of grid-row y positions visited
+        this.row = -1;
+        this.y = -step;
+        this.continuousY = this.y;
+        this.trail = [];
       }
     }
 
     update() {
-      // Continuous head mode: compute continuousY from globalFallDistance,
-      // grid-snapped to this drop's spawn base.
       const step = rowStep();
-      const speed = settings.fallSpeed * 1.2;
+      const speed = settings.fallSpeed * SPEED_SCALE;
       this.speedOffset += speed * (this.speedMultiplier - 1);
-
       this.continuousY = (globalFallDistance + this.speedOffset - this.spawnGridBase) - step;
-      const newRow = Math.floor(this.continuousY / step);
 
-      // Advance row(s) and leave grid-snapped trail entries
+      const newRow = Math.floor(this.continuousY / step);
       while (this.row < newRow) {
         this.row++;
         this.y = this.row * step;
@@ -228,86 +195,34 @@
         if (this.trail.length > settings.trailLength) this.trail.shift();
       }
 
-      // Off screen? (leading circle plus trail all off-screen)
-      const headPos = this.continuousY;
-      const trailTop = this.trail.length > 0 ? this.trail[0] : headPos;
-      if (trailTop > H() + rowStep() * 2) {
-        this.alive = false;
-      }
+      const trailTop = this.trail.length > 0 ? this.trail[0] : this.continuousY;
+      if (trailTop > H() + step * 2) this.alive = false;
     }
 
-    /* Fractional progress (0..1) toward the next grid row.
-       Used to smoothly interpolate trail circle sizes between discrete row steps. */
     get rowFraction() {
       const step = rowStep();
-      if (step <= 0) return 0;
-      return (this.continuousY / step) - this.row;
+      return step > 0 ? (this.continuousY / step) - this.row : 0;
     }
 
-    /* Helper: compute mouse proximity influence for glow + growth */
-    _mouseInfluence(px, py) {
-      const mr = settings.mouseRadius;
+    mouseInfluence(px, py) {
       const dist = Math.hypot(px - mouse.x, py - mouse.y);
-      const influence = dist < mr ? 1 - dist / mr : 0;
-      const extra = influence > 0 ? influence * 0.5 : 0;
-      return { extra, influence };
-    }
-
-    drawTrail(ctx) {
-      const yOff = columnYOffset(this.col);
-      const r = settings.circleRadius;
-      const trailLen = this.trail.length;
-      const frac = this.rowFraction;
-      const atMax = trailLen >= settings.trailLength;
-
-      // Draw trail circles (oldest first, smallest first)
-      for (let i = 0; i < trailLen; i++) {
-        const ty = this.trail[i] + yOff;
-        // Smoothly interpolate size using fractional row progress
-        const t = atMax
-          ? (i + 1 - frac) / (trailLen + 1)
-          : (i + 1) / (trailLen + 1 + frac);
-        const tCurve = t * t;
-        const circleR = r * (0.1 + 0.9 * tCurve);
-        const alpha = settings.trailDim ? (0.05 + 0.6 * tCurve) : 0.65;
-
-        const mi = this._mouseInfluence(this.x, ty);
-        const finalAlpha = alpha + mi.extra;
-
-        ctx.beginPath();
-        ctx.arc(this.x, ty, Math.max(circleR, 1), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,255,255,${finalAlpha})`;
-        ctx.fill();
-
-        if (mi.influence > 0) {
-          ctx.beginPath();
-          ctx.arc(this.x, ty, circleR * 1.6, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.08})`;
-          ctx.fill();
-        }
-      }
+      const influence = dist < settings.mouseRadius ? 1 - dist / settings.mouseRadius : 0;
+      return { extra: influence * 0.5, influence };
     }
 
     drawHead(ctx) {
-      const yOff = columnYOffset(this.col);
+      const headY = this.continuousY + columnYOffset(this.col);
       const r = settings.circleRadius;
-
-      // Draw leading (head) circle – always continuous mode
-      const headY = this.continuousY + yOff;
-      const headScale = 1;
-      const headFade = 1;
-
-      const mi = this._mouseInfluence(this.x, headY);
-      const headAlpha = headFade * (0.95 + mi.extra);
+      const mi = this.mouseInfluence(this.x, headY);
 
       ctx.beginPath();
-      ctx.arc(this.x, headY, r * headScale, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255,255,255,${headAlpha})`;
+      ctx.arc(this.x, headY, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${0.95 + mi.extra})`;
       ctx.fill();
 
       if (mi.influence > 0) {
         ctx.beginPath();
-        ctx.arc(this.x, headY, r * headScale * 2.2, 0, Math.PI * 2);
+        ctx.arc(this.x, headY, r * 2.2, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255,255,255,${mi.influence * 0.12})`;
         ctx.fill();
       }
@@ -315,21 +230,19 @@
   }
 
   // ── Background image for circle coloring ──────────────────────
-  let bgImage = null;       // offscreen canvas with cover-fitted image
-  let _bgRawImg = null;
+  let bgImage = null;
+  let bgRawImg = null;
 
-  // ── Image crossfade transition state ─────────────────────────
-  let nextBgImage = null;      // offscreen canvas for the incoming image
-  let _nextBgRawImg = null;
-  let transitionAlpha = 0;     // 0 = showing old image, 1 = fully transitioned
+  // Crossfade transition state
+  let nextBgImage = null;
+  let nextBgRawImg = null;
+  let transitionAlpha = 0;
   let transitioning = false;
-  const TRANSITION_DURATION = 2000; // ms for the fade-in
+  const TRANSITION_DURATION = 2000;
   let transitionStart = 0;
 
-  /** Fit image to a new offscreen canvas (cover mode) and return it. */
   function fitImageToCanvas(img) {
-    const sw = W();
-    const sh = H();
+    const sw = W(), sh = H();
     const offscreen = document.createElement("canvas");
     offscreen.width = sw;
     offscreen.height = sh;
@@ -339,22 +252,14 @@
     const scrAspect = sw / sh;
     let drawW, drawH, drawX, drawY;
     if (imgAspect > scrAspect) {
-      drawH = sh;
-      drawW = sh * imgAspect;
-      drawX = (sw - drawW) / 2;
-      drawY = 0;
+      drawH = sh; drawW = sh * imgAspect;
+      drawX = (sw - drawW) / 2; drawY = 0;
     } else {
-      drawW = sw;
-      drawH = sw / imgAspect;
-      drawX = 0;
-      drawY = (sh - drawH) / 2;
+      drawW = sw; drawH = sw / imgAspect;
+      drawX = 0; drawY = (sh - drawH) / 2;
     }
     octx.drawImage(img, drawX, drawY, drawW, drawH);
     return offscreen;
-  }
-
-  function fitImageToScreen(img) {
-    bgImage = fitImageToCanvas(img);
   }
 
   function loadBackgroundImage() {
@@ -367,12 +272,10 @@
         const img = new Image();
         img.onload = () => {
           if (!bgImage) {
-            // First load – show immediately
-            _bgRawImg = img;
-            fitImageToScreen(img);
+            bgRawImg = img;
+            bgImage = fitImageToCanvas(img);
           } else {
-            // Subsequent loads – crossfade into the new image
-            _nextBgRawImg = img;
+            nextBgRawImg = img;
             nextBgImage = fitImageToCanvas(img);
             transitioning = true;
             transitionStart = performance.now();
@@ -381,77 +284,66 @@
         };
         img.src = url;
       })
-      .catch(() => { /* silently fall back to white circles */ });
+      .catch(() => { /* fall back to white circles */ });
   }
 
-  window.addEventListener("resize", () => {
-    if (_bgRawImg) fitImageToScreen(_bgRawImg);
-    if (_nextBgRawImg) nextBgImage = fitImageToCanvas(_nextBgRawImg);
+  addEventListener("resize", () => {
+    if (bgRawImg) bgImage = fitImageToCanvas(bgRawImg);
+    if (nextBgRawImg) nextBgImage = fitImageToCanvas(nextBgRawImg);
   });
   loadBackgroundImage();
-
-  // ── Rotate image every 30 seconds ────────────────────────────
   setInterval(loadBackgroundImage, 30000);
 
   // ── State ─────────────────────────────────────────────────────
   let drops = [];
-  // Per-column spawn cooldowns to prevent synchronised spawns
   let columnCooldowns = [];
 
-  // Global fall distance for synchronized falling in continuous mode.
-  // All drops snap their spawn to the nearest grid boundary of this distance,
-  // ensuring their positions always differ by integer multiples of rowStep.
+  // All drops snap their spawn to the nearest grid boundary of this value,
+  // keeping positions aligned to integer multiples of rowStep.
   let globalFallDistance = 0;
 
-  // Track how many active drops per column for spawn-limiting
   function dropsInColumn(ci) {
     let n = 0;
     for (const d of drops) if (d.col === ci) n++;
     return n;
   }
 
-  // Check that no existing drop in the same column is within 3 vertical
-  // row steps of a newly spawned drop (which starts near the top).
   function canSpawnInColumn(ci) {
     const minSpacing = 3 * rowStep();
-    const spawnY = -rowStep(); // new drops start at row -1
+    const spawnY = -rowStep();
     for (const d of drops) {
-      if (d.col !== ci) continue;
-      const headY = d.continuousY;
-      if (Math.abs(headY - spawnY) < minSpacing) return false;
+      if (d.col === ci && Math.abs(d.continuousY - spawnY) < minSpacing) return false;
     }
     return true;
   }
 
-  // ── Initialise column cooldowns ────────────────────────────────
   function initCooldowns() {
-    const cols = columnCount();
-    columnCooldowns = Array.from({ length: cols }, () => randomCooldown());
+    columnCooldowns = Array.from({ length: columnCount() }, randomCooldown);
   }
   initCooldowns();
 
-  // ── Ghost image overlay (cached offscreen canvas for mouse hover) ──────
-  let _ghostCanvas = null;
-  let _ghostCtx = null;
-  let _ghostSize = 0;
+  // ── Ghost image overlay (offscreen canvas for mouse hover) ─────
+  let ghostCanvas = null;
+  let ghostCtx = null;
+  let ghostSize = 0;
 
   function getGhostCanvas(radius) {
     const size = Math.ceil(radius * 2);
-    if (!_ghostCanvas || _ghostSize !== size) {
-      _ghostCanvas = document.createElement("canvas");
-      _ghostCanvas.width = size;
-      _ghostCanvas.height = size;
-      _ghostCtx = _ghostCanvas.getContext("2d");
-      _ghostSize = size;
+    if (!ghostCanvas || ghostSize !== size) {
+      ghostCanvas = document.createElement("canvas");
+      ghostCanvas.width = size;
+      ghostCanvas.height = size;
+      ghostCtx = ghostCanvas.getContext("2d");
+      ghostSize = size;
     }
-    return { canvas: _ghostCanvas, ctx: _ghostCtx, size };
+    return { canvas: ghostCanvas, ctx: ghostCtx, size };
   }
 
-  // ── Residual circle growth state (for smooth grow/shrink near mouse) ───
-  const residualGrowth = new Map(); // key: "col,trailY" → current growth factor (0..1)
-  const GROWTH_SPEED = 0.08;  // how fast circles grow toward target
-  const SHRINK_SPEED = 0.04;  // how fast circles shrink back
-  const MAX_GROWTH = 1.8;     // maximum scale multiplier when mouse is directly on circle
+  // ── Smooth grow/shrink near mouse ──────────────────────────────
+  const residualGrowth = new Map();
+  const GROWTH_SPEED = 0.08;
+  const SHRINK_SPEED = 0.04;
+  const MAX_GROWTH   = 1.8;
 
   // ── Main loop ─────────────────────────────────────────────────
   function frame() {
@@ -459,39 +351,23 @@
     ctx.scale(devicePixelRatio, devicePixelRatio);
     ctx.clearRect(0, 0, W(), H());
 
-    // Background image is NOT drawn directly; circles are composited with it.
-
     const cols = columnCount();
-
-    // Ensure cooldown array matches column count (e.g. after resize)
     while (columnCooldowns.length < cols) columnCooldowns.push(randomCooldown());
 
-    // Advance global fall distance for grid synchronisation
-    {
-      const speed = settings.fallSpeed * 1.2;
-      globalFallDistance += speed;
-    }
+    globalFallDistance += settings.fallSpeed * SPEED_SCALE;
 
+    // Spawn new drops
     for (let c = 0; c < cols; c++) {
-      if (columnCooldowns[c] > 0) {
-        columnCooldowns[c]--;
-        continue;
-      }
+      if (columnCooldowns[c] > 0) { columnCooldowns[c]--; continue; }
       if (dropsInColumn(c) < settings.maxPerColumn && canSpawnInColumn(c) && Math.random() < settings.spawnRate) {
         drops.push(new Drop(c));
         columnCooldowns[c] = randomCooldown();
       }
     }
 
-    // Update all drops
-    for (const d of drops) {
-      d.update();
-    }
+    for (const d of drops) d.update();
 
-    // Pass 1: Draw trail circles (these get image-colored)
-    // Collect all trail circles and deduplicate by position so that
-    // overlapping residual circles at the same grid slot are drawn only once,
-    // with the largest circle winning.
+    // Collect trail circles, deduplicating by grid position (largest wins)
     const trailMap = new Map();
     const activeKeys = new Set();
     for (const d of drops) {
@@ -503,125 +379,99 @@
 
       for (let i = 0; i < trailLen; i++) {
         const ty = d.trail[i] + yOff;
-        // Smoothly interpolate size using fractional row progress
         const t = atMax
           ? (i + 1 - frac) / (trailLen + 1)
           : (i + 1) / (trailLen + 1 + frac);
         const tCurve = t * t;
         const circleR = r * (0.1 + 0.9 * tCurve);
         const alpha = settings.trailDim ? (0.05 + 0.6 * tCurve) : 0.65;
+        const mi = d.mouseInfluence(d.x, ty);
 
-        const mi = d._mouseInfluence(d.x, ty);
-        const finalAlpha = alpha + mi.extra;
-
-        const drawX = d.x;
-        const drawY = ty;
-
-        const key = d.col + "," + d.trail[i];
+        const key = `${d.col},${d.trail[i]}`;
         activeKeys.add(key);
         const existing = trailMap.get(key);
         if (!existing || circleR > existing.circleR) {
-          trailMap.set(key, { drawX, drawY, circleR, finalAlpha, influence: mi.influence, key });
+          trailMap.set(key, {
+            drawX: d.x, drawY: ty, circleR,
+            finalAlpha: alpha + mi.extra, influence: mi.influence, key
+          });
         }
       }
     }
 
-    // Clean up growth entries for circles that no longer exist
+    // Prune growth entries for circles that no longer exist
     for (const key of residualGrowth.keys()) {
       if (!activeKeys.has(key)) residualGrowth.delete(key);
     }
 
-    // Draw trail circles with smooth grow/shrink near mouse
+    // Draw trail circles with smooth grow/shrink
     for (const tc of trailMap.values()) {
-      // Compute target growth based on mouse proximity
-      const targetGrowth = tc.influence;
-      // Smoothly interpolate current growth toward target
-      const currentGrowth = residualGrowth.get(tc.key) || 0;
-      let newGrowth;
-      if (targetGrowth > currentGrowth) {
-        newGrowth = currentGrowth + (targetGrowth - currentGrowth) * GROWTH_SPEED;
-      } else {
-        newGrowth = currentGrowth + (targetGrowth - currentGrowth) * SHRINK_SPEED;
-      }
-      // Snap to zero if very small to avoid lingering micro-growth
-      if (newGrowth < 0.001) newGrowth = 0;
-      residualGrowth.set(tc.key, newGrowth);
+      const current = residualGrowth.get(tc.key) || 0;
+      const rate = tc.influence > current ? GROWTH_SPEED : SHRINK_SPEED;
+      let growth = current + (tc.influence - current) * rate;
+      if (growth < 0.001) growth = 0;
+      residualGrowth.set(tc.key, growth);
 
-      // Apply growth: scale the radius up
-      const growScale = 1 + newGrowth * (MAX_GROWTH - 1);
-      const grownR = tc.circleR * growScale;
+      const grownR = tc.circleR * (1 + growth * (MAX_GROWTH - 1));
 
       ctx.beginPath();
       ctx.arc(tc.drawX, tc.drawY, Math.max(grownR, 1), 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,255,255," + tc.finalAlpha + ")";
+      ctx.fillStyle = `rgba(255,255,255,${tc.finalAlpha})`;
       ctx.fill();
 
-      // Glow ring for circles near mouse
-      if (newGrowth > 0.01) {
+      if (growth > 0.01) {
         ctx.beginPath();
         ctx.arc(tc.drawX, tc.drawY, grownR * 1.4, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255," + (newGrowth * 0.1) + ")";
+        ctx.fillStyle = `rgba(255,255,255,${growth * 0.1})`;
         ctx.fill();
       }
     }
 
-    // Composite background image through trail circles so each trail circle
-    // shows the image color at its position (avoids getImageData / CORS).
-    if (!settings.whiteCirclesOnly) {
-      // Advance crossfade transition
+    // Composite background image through trail circles
+    if (!settings.whiteCirclesOnly && bgImage) {
       if (transitioning && nextBgImage) {
         const elapsed = performance.now() - transitionStart;
         transitionAlpha = Math.min(elapsed / TRANSITION_DURATION, 1);
         if (transitionAlpha >= 1) {
-          // Transition complete – promote next image to current
           bgImage = nextBgImage;
-          _bgRawImg = _nextBgRawImg;
+          bgRawImg = nextBgRawImg;
           nextBgImage = null;
-          _nextBgRawImg = null;
+          nextBgRawImg = null;
           transitioning = false;
           transitionAlpha = 0;
         }
       }
 
-      if (bgImage) {
-        ctx.globalCompositeOperation = "source-atop";
-
-        if (transitioning && nextBgImage) {
-          // Blend old and new images during crossfade
-          ctx.globalAlpha = 1 - transitionAlpha;
-          ctx.drawImage(bgImage, 0, 0, W(), H());
-          ctx.globalAlpha = transitionAlpha;
-          ctx.drawImage(nextBgImage, 0, 0, W(), H());
-          ctx.globalAlpha = 1;
-        } else {
-          ctx.drawImage(bgImage, 0, 0, W(), H());
-        }
-
-        // Adjust brightness of image-colored trail circles
-        const brightness = settings.trailBrightness;
-        if (brightness < 1) {
-          const darkenAmount = 1 - brightness;
-          ctx.fillStyle = `rgba(0,0,0,${darkenAmount})`;
-          ctx.fillRect(0, 0, W(), H());
-        } else if (brightness > 1) {
-          const brightenAmount = Math.min(brightness - 1, 1);
-          ctx.fillStyle = `rgba(255,255,255,${brightenAmount})`;
-          ctx.fillRect(0, 0, W(), H());
-        }
-
-        ctx.globalCompositeOperation = "source-over";
+      ctx.globalCompositeOperation = "source-atop";
+      if (transitioning && nextBgImage) {
+        ctx.globalAlpha = 1 - transitionAlpha;
+        ctx.drawImage(bgImage, 0, 0, W(), H());
+        ctx.globalAlpha = transitionAlpha;
+        ctx.drawImage(nextBgImage, 0, 0, W(), H());
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.drawImage(bgImage, 0, 0, W(), H());
       }
+
+      // Brightness adjustment
+      const b = settings.trailBrightness;
+      if (b < 1) {
+        ctx.fillStyle = `rgba(0,0,0,${1 - b})`;
+        ctx.fillRect(0, 0, W(), H());
+      } else if (b > 1) {
+        ctx.fillStyle = `rgba(255,255,255,${Math.min(b - 1, 1)})`;
+        ctx.fillRect(0, 0, W(), H());
+      }
+
+      ctx.globalCompositeOperation = "source-over";
     }
 
-    // Pass 2: Draw head circles on top (these stay white)
-    for (const d of drops) {
-      d.drawHead(ctx);
-    }
+    // Draw head circles on top (always white)
+    for (const d of drops) d.drawHead(ctx);
 
-    // Prune dead drops
     drops = drops.filter(d => d.alive);
 
-    // Draw subtle column guides (very faint vertical lines)
+    // Faint column guides
     ctx.strokeStyle = "rgba(255,255,255,0.03)";
     ctx.lineWidth = 1;
     for (let c = 0; c < cols; c++) {
@@ -632,25 +482,23 @@
       ctx.stroke();
     }
 
-    // ── Ghost image reveal near mouse cursor ────────────────────
-    if (!settings.whiteCirclesOnly && bgImage && mouse.x > -9000) {
+    // Ghost image reveal near cursor
+    if (!settings.whiteCirclesOnly && bgImage && mouse.x > MOUSE_OFFSCREEN + 1) {
       const ghostR = settings.mouseRadius;
       const ghostAlpha = settings.mouseRevealBrightness;
       const { canvas: gc, ctx: gctx, size: gSize } = getGhostCanvas(ghostR);
 
       gctx.clearRect(0, 0, gSize, gSize);
 
-      // Radial gradient mask: semi-transparent at centre, transparent at edge
       const grad = gctx.createRadialGradient(ghostR, ghostR, 0, ghostR, ghostR, ghostR);
-      grad.addColorStop(0, "rgba(255,255,255," + ghostAlpha + ")");
-      grad.addColorStop(0.6, "rgba(255,255,255," + (ghostAlpha * 0.4) + ")");
+      grad.addColorStop(0, `rgba(255,255,255,${ghostAlpha})`);
+      grad.addColorStop(0.6, `rgba(255,255,255,${ghostAlpha * 0.4})`);
       grad.addColorStop(1, "rgba(255,255,255,0)");
       gctx.globalCompositeOperation = "source-over";
       gctx.fillStyle = grad;
       gctx.fillRect(0, 0, gSize, gSize);
 
-      // Composite background image through the gradient mask.
-      // Only blit the visible sub-rectangle to avoid drawing the full image.
+      // Blit only the visible sub-rectangle of the background
       gctx.globalCompositeOperation = "source-in";
       const gx = mouse.x - ghostR;
       const gy = mouse.y - ghostR;
@@ -674,8 +522,6 @@
       }
 
       gctx.globalCompositeOperation = "source-over";
-
-      // Stamp ghost onto main canvas
       ctx.drawImage(gc, gx, gy);
     }
 

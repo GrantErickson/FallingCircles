@@ -34,11 +34,13 @@ Click the **⚙** button in the top-right corner to open the settings panel. All
 |---|---|
 | **Circle Radius** | Size of the falling circles (3 – 20 px). |
 | **Fall Speed** | How fast circles descend (0.5 – 6). |
+| **Speed Variation** | Random per-drop speed offset for an organic feel (0 = uniform, 1 = ±100%). |
 | **Spawn Rate** | Probability a new circle appears per column per frame (controls density). |
 | **Trail Length** | Number of trail dots left behind each circle. |
 | **Max Circles per Column** | Cap on simultaneous drops in one column. |
 | **Gap Between Circles** | Pixel gap between columns (keeps adjacent circles from touching). |
 | **Mouse Effect Radius** | How far the mouse influence extends. |
+| **Mouse Reveal Brightness** | Opacity of the background image revealed near the cursor. |
 
 #### Image Trail
 
@@ -47,15 +49,6 @@ Click the **⚙** button in the top-right corner to open the settings panel. All
 | **White Circles Only** | Disables the background image coloring, rendering plain white circles instead. |
 | **Trail Dim** | Trail circles fade in opacity in addition to shrinking. |
 | **Trail Brightness** | Adjusts the brightness of image-colored trail circles (0 = dark, 1 = normal, 2 = bright). |
-
-#### Head Circle Tuning
-
-| Setting | What it controls |
-|---|---|
-| **Continuous Head** | The head circle falls smoothly while leaving a quantized trail behind it. |
-| **Head Smoothing** | Controls interpolation between grid rows (0 = snap to grid, 1 = fully smooth glide). |
-| **Head Scale Min** | Minimum scale when the head circle first appears at a new row. |
-| **Head Fade Min** | Minimum opacity when the head circle first appears at a new row. |
 
 ### Mouse Interaction
 Move the mouse over the canvas to interact with the circles:
