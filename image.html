@@ -28,7 +28,14 @@
 <body>
   <script>
     const params = new URLSearchParams(window.location.search);
-    const url = params.get("url");
+    const raw = params.get("url");
+    let url = null;
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+        url = parsed.href;
+      }
+    } catch { /* invalid URL */ }
     if (url) {
       const img = document.createElement("img");
       img.src = url;
