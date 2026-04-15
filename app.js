@@ -128,7 +128,7 @@
   openImageBtn.addEventListener("click", () => {
     const url = bgRawImg ? bgRawImg.src : null;
     if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open("image.html?url=" + encodeURIComponent(url), "_blank", "noopener,noreferrer");
   });
 
   function updateOpenImageBtn() {

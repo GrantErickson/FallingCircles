@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    img {
+      max-width: 100%;
+      max-height: 100vh;
+      object-fit: contain;
+    }
+    .error {
+      color: #ccc;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const url = params.get("url");
+    if (url) {
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = "Background image";
+      document.body.appendChild(img);
+    } else {
+      const msg = document.createElement("p");
+      msg.className = "error";
+      msg.textContent = "No image URL provided. Use ?url=<image-url>";
+      document.body.appendChild(msg);
+    }
+  </script>
+</body>
+</html>
