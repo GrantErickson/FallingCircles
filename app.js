@@ -127,7 +127,17 @@
   const openImageBtn = document.getElementById("openImageBtn");
   openImageBtn.addEventListener("click", () => {
     const url = bgRawImg ? bgRawImg.src : null;
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    if (!url) return;
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(
+        `<!DOCTYPE html><html><head><title>Background Image</title>` +
+        `<style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000}` +
+        `img{max-width:100%;max-height:100vh;object-fit:contain}</style></head>` +
+        `<body><img src="${url}"></body></html>`
+      );
+      w.document.close();
+    }
   });
 
   function updateOpenImageBtn() {
