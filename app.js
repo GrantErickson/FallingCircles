@@ -128,17 +128,7 @@
   openImageBtn.addEventListener("click", () => {
     const url = bgRawImg ? bgRawImg.src : null;
     if (!url) return;
-    const w = window.open("", "_blank", "noopener,noreferrer");
-    if (w) {
-      w.document.write(
-        "<!DOCTYPE html><html><head><title>Background Image</title>" +
-        "<style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000}" +
-        "img{max-width:100%;max-height:100vh;object-fit:contain}</style></head>" +
-        "<body><img id='img' alt='Background Image'></body></html>"
-      );
-      w.document.getElementById("img").src = url;
-      w.document.close();
-    }
+    window.open(url, "_blank", "noopener,noreferrer");
   });
 
   function updateOpenImageBtn() {
