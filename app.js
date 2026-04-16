@@ -131,9 +131,15 @@
     window.open("image.html?url=" + encodeURIComponent(url), "_blank", "noopener,noreferrer");
   });
 
+  const nextImageBtn = document.getElementById("nextImageBtn");
+  nextImageBtn.addEventListener("click", () => {
+    loadBackgroundImage();
+  });
+
   function updateOpenImageBtn() {
     const visible = !settings.whiteCirclesOnly && !!bgRawImg;
     openImageBtn.classList.toggle("hidden", !visible);
+    nextImageBtn.classList.toggle("hidden", !!settings.whiteCirclesOnly);
   }
 
   // ── Mouse tracking ────────────────────────────────────────────
