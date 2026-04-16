@@ -1,0 +1,16 @@
+# Copilot Cloud Agent Setup Steps
+# FallingCircles is a pure static HTML/CSS/JS project with no build tools or dependencies.
+# This file configures the environment for the GitHub Copilot coding agent.
+
+name: "Copilot Setup"
+
+steps:
+  - name: "Verify static files exist"
+    run: |
+      echo "FallingCircles — pure vanilla HTML/CSS/JS, no build step"
+      echo ""
+      echo "Checking project files..."
+      ls -la index.html app.js style.css image.html readme.md
+      echo ""
+      echo "No dependencies to install. No build step required."
+      echo "To test: open index.html in a browser."
