@@ -1,0 +1,23 @@
+{
+  "name": "fallingcircles",
+  "version": "1.0.0",
+  "description": "A mesmerizing, interactive canvas animation of circles cascading down tightly-packed columns.",
+  "scripts": {
+    "build": "tsc --noEmit && esbuild src/main.ts --bundle --outfile=app.js --target=es2022",
+    "typecheck": "tsc --noEmit",
+    "dev": "esbuild src/main.ts --bundle --outfile=app.js --target=es2022 --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GrantErickson/FallingCircles.git"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/GrantErickson/FallingCircles/issues"
+  },
+  "homepage": "https://granterickson.github.io/FallingCircles/",
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
+  }
+}
