@@ -16,7 +16,7 @@ FallingCircles is a browser-based canvas animation of circles cascading down hex
 | `src/background.ts` | Background image state (`bgState`), `loadBackgroundImage`, `fitImageToCanvas`, `tickTransition`, `drawBackground`, `drawGhost` |
 | `src/main.ts` | Entry point: canvas setup, UI wiring, mouse tracking, animation state, `frame()` render loop |
 | `index.html` | Page structure, settings panel markup, and slider/checkbox controls |
-| `style.css` | Styling for the overlay UI (settings panel, buttons) and the full-screen canvas |
+| `src/style.scss` | SCSS styles with variables, nesting, and mixins. Compiled to `style.css` by Dart Sass. |
 | `image.html` | Standalone image viewer page opened via the 🖼 button |
 | `package.json` | Dev dependencies (`typescript`, `esbuild`) and build scripts |
 | `tsconfig.json` | TypeScript compiler configuration |
@@ -25,7 +25,7 @@ FallingCircles is a browser-based canvas animation of circles cascading down hex
 ## Architecture
 
 - **TypeScript modules** — Source is split into focused modules in `src/`. Each module exports only what other modules need.
-- **esbuild bundler** — `npm run build` runs `tsc --noEmit` (type checking) then `esbuild src/main.ts --bundle --outfile=app.js` to produce a single browser-ready `app.js`.
+- **esbuild bundler** — `npm run build` runs `tsc --noEmit` (type checking), `sass src/style.scss style.css` (SCSS compilation), then `esbuild src/main.ts --bundle --outfile=app.js` to produce a single browser-ready `app.js`.
 - **Canvas 2D API** — Rendering uses `requestAnimationFrame` for the main loop. Offscreen canvases are used for compositing (ghost image reveal near cursor).
 - **Hex-grid layout** — Columns are one circle-diameter wide plus a configurable gap. Odd columns are offset vertically by half a row step for an interlocking pattern.
 - **Deterministic spawning** — Drop spawn timing is derived from `spawnInterval()` (viewport height / maxPerColumn), not random probability. Per-column `columnNextSpawn` thresholds track `globalFallDistance` with ±20% random jitter.
@@ -36,10 +36,10 @@ FallingCircles is a browser-based canvas animation of circles cascading down hex
 ## Build & Development
 
 ```bash
-npm install          # Install dev dependencies (typescript, esbuild)
-npm run build        # Type-check then bundle → app.js
+npm install          # Install dev dependencies (typescript, esbuild, sass)
+npm run build        # Type-check, compile SCSS, then bundle JS → app.js + style.css
 npm run typecheck    # Type-check only (no output)
-npm run dev          # Watch mode: rebuild app.js on file changes
+npm run dev          # Watch mode: rebuild app.js and style.css on file changes
 ```
 
 Serve the project root with a local HTTP server for testing (ES modules require HTTP):
@@ -89,7 +89,7 @@ npx serve .
 - Use `rgba()` for semi-transparent colors.
 - Use `backdrop-filter: blur()` for glassmorphism UI effects.
 - Use CSS transitions for smooth UI state changes (panel show/hide, button hover).
-- Keep all styles in `style.css` — do not use inline styles in HTML except for dynamically computed values in JavaScript.
+- Keep all styles in `src/style.scss` — do not use inline styles in HTML except for dynamically computed values in JavaScript.
 
 ### HTML
 

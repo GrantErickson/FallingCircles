@@ -1,5 +1,5 @@
 # Copilot Cloud Agent Setup Steps
-# FallingCircles uses TypeScript (compiled via esbuild) with no runtime dependencies.
+# FallingCircles uses TypeScript (esbuild) and SCSS (Dart Sass) with no runtime dependencies.
 # This file configures the environment for the GitHub Copilot coding agent.
 
 name: "Copilot Setup"
@@ -10,7 +10,7 @@ steps:
       echo "Installing dev dependencies..."
       npm ci
       echo ""
-      echo "Building TypeScript sources..."
+      echo "Building TypeScript and SCSS sources..."
       npm run build
       echo ""
       echo "Build complete. To test: serve the project root with a local HTTP server."
