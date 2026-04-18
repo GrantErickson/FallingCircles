@@ -1,16 +1,16 @@
 # Copilot Cloud Agent Setup Steps
-# FallingCircles is a pure static HTML/CSS/JS project with no build tools or dependencies.
+# FallingCircles uses TypeScript (esbuild) and SCSS (Dart Sass) with no runtime dependencies.
 # This file configures the environment for the GitHub Copilot coding agent.
 
 name: "Copilot Setup"
 
 steps:
-  - name: "Verify static files exist"
+  - name: "Install dependencies and build"
     run: |
-      echo "FallingCircles — pure vanilla HTML/CSS/JS, no build step"
+      echo "Installing dev dependencies..."
+      npm ci
       echo ""
-      echo "Checking project files..."
-      ls -la index.html app.js style.css image.html readme.md
+      echo "Building TypeScript and SCSS sources..."
+      npm run build
       echo ""
-      echo "No dependencies to install. No build step required."
-      echo "To test: open index.html in a browser."
+      echo "Build complete. To test: serve the project root with a local HTTP server."

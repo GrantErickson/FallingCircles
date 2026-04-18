@@ -1,0 +1,187 @@
+// ── Variables ─────────────────────────────────────────────────
+
+$bg-color:        #0a0a0a;
+$text-color:      #ddd;
+$white:           #fff;
+$accent-color:    #888;
+
+$overlay-bg:      rgba(255, 255, 255, 0.1);
+$overlay-bg-hover: rgba(255, 255, 255, 0.25);
+$overlay-border:  rgba(255, 255, 255, 0.25);
+
+$panel-bg:        rgba(20, 20, 20, 0.92);
+$panel-border:    rgba(255, 255, 255, 0.15);
+
+$btn-size:        40px;
+$btn-radius:      50%;
+$panel-radius:    12px;
+$panel-width:     280px;
+$panel-right:     12px;
+$panel-top:       60px;
+
+$font-stack:      'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+$transition-fast: 0.2s;
+$transition-mid:  0.25s;
+$blur-light:      blur(6px);
+$blur-heavy:      blur(12px);
+
+// ── Mixins ────────────────────────────────────────────────────
+
+@mixin icon-button {
+  position: fixed;
+  z-index: 100;
+  background: $overlay-bg;
+  border: 1px solid $overlay-border;
+  color: $white;
+  width: $btn-size;
+  height: $btn-size;
+  border-radius: $btn-radius;
+  cursor: pointer;
+  backdrop-filter: $blur-light;
+  transition: background $transition-fast;
+
+  &:hover { background: $overlay-bg-hover; }
+}
+
+// ── Reset & Base ──────────────────────────────────────────────
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: $bg-color;
+  overflow: hidden;
+  font-family: $font-stack;
+  color: $text-color;
+}
+
+canvas {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+// ── Settings Toggle ───────────────────────────────────────────
+
+#settingsToggle {
+  @include icon-button;
+  top: 12px;
+  right: $panel-right;
+  font-size: 22px;
+}
+
+// ── Bottom-right Image Buttons ────────────────────────────────
+
+#nextImageBtn,
+#openImageBtn {
+  @include icon-button;
+  right: $panel-right;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background $transition-fast, opacity $transition-mid;
+
+  &.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+#nextImageBtn { bottom: 60px; }
+#openImageBtn { bottom: 12px; }
+
+// ── Settings Panel ────────────────────────────────────────────
+
+#settingsPanel {
+  position: fixed;
+  top: $panel-top;
+  right: $panel-right;
+  z-index: 99;
+  width: $panel-width;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  background: $panel-bg;
+  border: 1px solid $panel-border;
+  border-radius: $panel-radius;
+  padding: 18px;
+  backdrop-filter: $blur-heavy;
+  transition: opacity $transition-mid, transform $transition-mid;
+
+  &.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-8px);
+  }
+
+  h2 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+
+  h3 {
+    font-size: 13px;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    opacity: 0.6;
+  }
+
+  label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    accent-color: $accent-color;
+  }
+
+  span {
+    min-width: 30px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.7;
+    font-size: 12px;
+  }
+}
+
+// ── Checkbox Label ────────────────────────────────────────────
+
+.checkbox-label {
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  input[type="checkbox"] {
+    accent-color: $accent-color;
+  }
+}
+
+// ── Reset Button ──────────────────────────────────────────────
+
+#resetSettings {
+  margin-top: 14px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid $overlay-border;
+  background: $overlay-bg;
+  color: $white;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background $transition-fast;
+
+  &:hover { background: $overlay-bg-hover; }
+}
