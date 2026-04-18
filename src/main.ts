@@ -112,8 +112,8 @@ addEventListener("mouseleave", () => { mouse.x = MOUSE_OFFSCREEN; mouse.y = MOUS
 // ── Background image setup ────────────────────────────────────
 
 addEventListener("resize", () => {
-  if (bgState.bgRawImg) bgState.bgImage = fitImageToCanvas(bgState.bgRawImg);
-  if (bgState.nextBgRawImg) bgState.nextBgImage = fitImageToCanvas(bgState.nextBgRawImg);
+  if (bgState.bgRawImg) bgState.bgImage = fitImageToCanvas(bgState.bgRawImg, bgState.bgFocalX, bgState.bgFocalY);
+  if (bgState.nextBgRawImg) bgState.nextBgImage = fitImageToCanvas(bgState.nextBgRawImg, bgState.nextFocalX, bgState.nextFocalY);
 });
 loadBackgroundImage(updateOpenImageBtn);
 setInterval(() => loadBackgroundImage(updateOpenImageBtn), 30000);
