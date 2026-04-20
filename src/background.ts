@@ -96,6 +96,26 @@ export function fitImageToCanvas(img: HTMLImageElement, focalX = 0.5, focalY = 0
   return offscreen;
 }
 
+// Applies a loaded image to the background state, triggering a crossfade if an image is already active.
+async function applyLoadedImage(img: HTMLImageElement, canDetectFaces: boolean, onLoaded: () => void): Promise<void> {
+  const [focalX, focalY] = canDetectFaces ? await detectFocalPoint(img) : [0.5, 0.5];
+  if (!bgState.bgImage) {
+    bgState.bgRawImg = img;
+    bgState.bgFocalX = focalX;
+    bgState.bgFocalY = focalY;
+    bgState.bgImage = fitImageToCanvas(img, focalX, focalY);
+    onLoaded();
+  } else {
+    bgState.nextBgRawImg = img;
+    bgState.nextFocalX = focalX;
+    bgState.nextFocalY = focalY;
+    bgState.nextBgImage = fitImageToCanvas(img, focalX, focalY);
+    bgState.transitioning = true;
+    bgState.transitionStart = performance.now();
+    bgState.transitionAlpha = 0;
+  }
+}
+
 export function loadBackgroundImage(onLoaded: () => void): void {
   fetch("https://app.ais.team/api/ImageSearchService/getRandomCuratedImageUrls?count=1")
     .then(r => r.json())
@@ -105,24 +125,19 @@ export function loadBackgroundImage(onLoaded: () => void): void {
       const url = Array.isArray(urls) ? (urls as string[])[0] : (urls as string);
       if (!url) return;
       const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = async () => {
-        const [focalX, focalY] = await detectFocalPoint(img);
-        if (!bgState.bgImage) {
-          bgState.bgRawImg = img;
-          bgState.bgFocalX = focalX;
-          bgState.bgFocalY = focalY;
-          bgState.bgImage = fitImageToCanvas(img, focalX, focalY);
-          onLoaded();
-        } else {
-          bgState.nextBgRawImg = img;
-          bgState.nextFocalX = focalX;
-          bgState.nextFocalY = focalY;
-          bgState.nextBgImage = fitImageToCanvas(img, focalX, focalY);
-          bgState.transitioning = true;
-          bgState.transitionStart = performance.now();
-          bgState.transitionAlpha = 0;
-        }
+      // Only request CORS when FaceDetector is available (needed to analyze pixels).
+      // If CORS fails, retry without crossOrigin — images still load but face detection is skipped.
+      if (faceDetector) {
+        img.crossOrigin = "anonymous";
+      }
+      img.onload = () => { applyLoadedImage(img, !!faceDetector && !!img.crossOrigin, onLoaded); };
+      img.onerror = () => {
+        if (!img.crossOrigin) return;
+        // CORS rejected by image server — retry without crossOrigin
+        const fallback = new Image();
+        fallback.onload = () => { applyLoadedImage(fallback, false, onLoaded); };
+        fallback.onerror = () => { /* network or URL error — fall back to white circles */ };
+        fallback.src = url;
       };
       img.src = url;
     })
